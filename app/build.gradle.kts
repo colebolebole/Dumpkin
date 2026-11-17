@@ -18,8 +18,8 @@ android {
         // targeting API 29+. The Pumpkin engine is downloaded at runtime and executed from there
         // (same approach Termux uses), so this app is meant to be sideloaded, not published on Play.
         targetSdk = 28
-        versionCode = 4
-        versionName = "0.4.0-alpha"
+        versionCode = 5
+        versionName = "0.5.0-alpha"
     }
 
     // Release signing. The key lives outside the repo; see "Release signing" in the README.
