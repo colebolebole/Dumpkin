@@ -11,3 +11,9 @@
 
 .tools/
 /dist/
+
+# Release signing: never commit keys or passwords
+keystore.properties
+*.jks
+*.keystore
+*.p12

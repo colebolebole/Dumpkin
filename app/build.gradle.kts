@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -21,13 +22,44 @@ android {
         versionName = "0.2.0-alpha"
     }
 
+    // Release signing. The key lives outside the repo; see "Release signing" in the README.
+    // Settings come from keystore.properties (git-ignored) or ANCRAFT_* environment variables.
+    val signingProps = Properties().apply {
+        rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+    }
+    fun signingValue(prop: String, env: String): String? =
+        signingProps.getProperty(prop)?.takeIf { it.isNotBlank() } ?: System.getenv(env)?.takeIf { it.isNotBlank() }
+
+    val releaseStore = signingValue("storeFile", "ANCRAFT_KEYSTORE_FILE")?.let { file(it) }
+    val hasReleaseKey = releaseStore?.exists() == true
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = releaseStore
+                storePassword = signingValue("storePassword", "ANCRAFT_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "ANCRAFT_KEY_ALIAS") ?: "ancraft"
+                keyPassword = signingValue("keyPassword", "ANCRAFT_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Sign with the debug key so `assembleRelease` yields an installable APK out of the box.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKey) {
+                signingConfigs.getByName("release")
+            } else {
+                // Contributors without the key can still build an installable APK, but it must never be published.
+                // Pass -PrequireReleaseKey (e.g. in a release script) to turn this into a hard error.
+                if (project.hasProperty("requireReleaseKey")) {
+                    throw GradleException("Release signing key not found. Create keystore.properties (see README).")
+                }
+                logger.warn("WARNING: no release signing key found, signing the release build with the DEBUG key.")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

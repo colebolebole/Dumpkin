@@ -30,8 +30,9 @@
 4. On the **Servers** tab, tap **New server**, then start it. Players on the same Wi-Fi join with the address shown on the server screen.
 
 > [!NOTE]
-> Releases are signed with a debug key for now, so a future build signed differently can't update in place. Uninstalling
-> removes server data, so back up worlds first.
+> `0.1.0-alpha` and `0.2.0-alpha` were signed with a throwaway debug key. Builds signed with the real release key can't
+> update over them, so moving from those to a later release means uninstalling first, which removes server data.
+> Back up worlds before you do.
 
 ## Server settings
 
@@ -85,9 +86,32 @@ Requires JDK 17+ and the Android SDK (platform 36), or just Android Studio. The 
 
 ```bash
 ./gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
-./gradlew assembleRelease      # minified, signed with the debug key
+./gradlew assembleRelease      # minified; signed with the release key if configured (see below)
 ./gradlew testDebugUnitTest    # config patcher, profile round-trip, Engine-screen smoke tests
 ```
+
+### Release signing
+
+Release builds are signed with a private key that is **not** in this repository.
+
+1. Create a keystore once (keep it outside the repo):
+
+   ```bash
+   keytool -genkeypair -keystore ~/.ancraft/ancraft-release.jks -storetype PKCS12 -alias ancraft \
+     -keyalg RSA -keysize 4096 -validity 10950 -dname "CN=AnCraft"
+   ```
+
+2. Copy `keystore.properties.example` to `keystore.properties` (git-ignored) and fill in the path and passwords, or set the
+   `ANCRAFT_KEYSTORE_FILE`, `ANCRAFT_KEYSTORE_PASSWORD`, `ANCRAFT_KEY_ALIAS` and `ANCRAFT_KEY_PASSWORD` environment variables.
+3. Build with `./gradlew assembleRelease -PrequireReleaseKey`. That flag makes the build fail if the key is missing,
+   instead of quietly falling back to the debug key (which is what happens without it, with a warning, so contributors
+   can still build an installable APK). Never publish a fallback build.
+4. Check the result with `apksigner verify --print-certs app-release.apk`: the signer should be `CN=AnCraft`.
+
+> [!IMPORTANT]
+> **Back up the keystore file and its passwords** (for example in a password manager). Android only installs an update
+> if it is signed with the same key as the installed app, so if the key is lost, every user has to uninstall and
+> reinstall, losing their servers. Don't commit the key or `keystore.properties`.
 
 Material 3 is pinned to `1.5.0-alpha10`: the Expressive APIs aren't public in 1.4.0 stable, and newer 1.5 builds need
 Android Gradle Plugin 9+. Expect some API churn when you bump it.
