@@ -191,7 +191,12 @@ Android Gradle Plugin 9+. Expect some API churn when you bump it.
 
 </details>
 
+## License
+
+Dumpkin is released under the [MIT License](LICENSE).
+
 ## Credits
 
 Dumpkin is an unofficial project and is not affiliated with Pumpkin, Mojang or Microsoft. Pumpkin is licensed GPL-3.0;
-Dumpkin only downloads and runs its released binary. The app has no license file yet.
+Dumpkin does not include or link against it, it only downloads the released binary at runtime and runs it as a separate
+process, so the MIT license covers Dumpkin's own code and Pumpkin stays under its own license.
