@@ -16,6 +16,7 @@
 - **One-tap engine.** Downloads the official `pumpkin-aarch64-android` build (Stable, Canary or Nightly) from Pumpkin's GitHub releases.
 - **Web dashboard.** Turn it on and create, start, stop and manage servers from a browser on your PC or another phone: console, every setting, the config file and engine downloads. Password protected (see [Web dashboard](#web-dashboard)).
 - **Multiple servers.** Each has its own folder, port, world and `pumpkin.toml`.
+- **Bedrock on every server.** Each server can have its own Bedrock port, so several Bedrock servers run side by side (see [Bedrock servers](#bedrock-servers)).
 - **Runs in the background.** A foreground service with a wake lock and low-latency Wi-Fi lock keeps servers up, with a "Stop all" button in the notification.
 - **Live console.** Send commands and watch players, uptime and RAM use. Tap the command box and the console takes over the whole screen; close the keyboard and everything comes back.
 - **Roomy settings.** The status card rolls up as you scroll down the settings and returns as soon as you scroll up.
@@ -35,6 +36,8 @@
 > Dumpkin installs *next to* AnCraft instead of updating it, and worlds are not migrated. Keep AnCraft until you've
 > finished with its servers, then uninstall it. The `0.1.0` and `0.2.0` AnCraft releases were signed with a throwaway
 > debug key; Dumpkin releases use a proper release key.
+
+Dumpkin releases share one package name and release key, so a newer APK (for example 0.4.0) installs over an older one and keeps your servers.
 
 ## Web dashboard
 
@@ -68,7 +71,7 @@ Everything the page does goes through a JSON API, so you can script it. Sign in 
 | Method and path | What it does |
 | --- | --- |
 | `GET /api/state` | Phone info, engine builds and every server with its status |
-| `POST /api/servers` | Create a server (`name` plus any setting) |
+| `POST /api/servers` | Create a server (`name` plus any setting, such as `bedrock` and `bedrockPort`) |
 | `GET`, `PATCH`, `DELETE /api/servers/{id}` | Read, change or delete a server (delete only while stopped) |
 | `POST /api/servers/{id}/start`, `/stop` | Start or stop it |
 | `POST /api/servers/{id}/command` | Send a console command (`{"command": "list"}`) |
@@ -99,6 +102,18 @@ limit, which applies as soon as you save.
 | | **Lightweight server-list ping** | On by default. Leaves the server icon out of the multiplayer-list response |
 | | Bedrock support, **Bedrock port** | Experimental. Each server has its own Bedrock port (default 19132, then the next free one), so several Bedrock servers can run at once. Set it when creating a server or later in Settings |
 | Engine | Build to use | "Newest", or pin a specific installed build |
+
+## Bedrock servers
+
+Bedrock support is experimental in Pumpkin, and off by default. To use it:
+
+1. Turn on **Bedrock support** when you create a server (in the app or the web dashboard), or later in **Settings → Network**.
+2. Check the **Bedrock port**. It starts at 19132, then the next free port, so a second Bedrock server gets 19133.
+3. Bedrock players join with your phone's address and that port, for example `192.168.0.83:19133`.
+
+Every server needs its own Bedrock port. Dumpkin rejects a port that matches the server's own Java port, or any other
+server's Java or Bedrock port. Servers that already used Bedrock keep 19132. The port is written to
+`[networking.bedrock.nethernet] address` in `pumpkin.toml`.
 
 ## Engine tab
 
