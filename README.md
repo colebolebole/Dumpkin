@@ -30,7 +30,9 @@
 1. Download `Dumpkin-<version>.apk` from the [Releases](https://github.com/colebolebole/Dumpkin/releases) page.
 2. Sideload it on an **arm64** phone running Android 8.0 or newer.
 3. Open the **Engine** tab and download a Pumpkin build.
-4. On the **Servers** tab, tap **New server**, then start it. Players on the same Wi-Fi join with the address shown on the server screen.
+4. Open the **Tuning** tab and deal with anything it flags. Allowing Dumpkin to ignore battery optimisation matters most:
+   without it Android can freeze servers when the screen is off.
+5. On the **Servers** tab, tap **New server**, then start it. Players on the same Wi-Fi join with the address shown on the server screen.
 
 > [!NOTE]
 > **Coming from AnCraft?** The app was renamed and its Android package changed from `app.ancraft` to `app.dumpkin`, so
@@ -38,7 +40,7 @@
 > finished with its servers, then uninstall it. The `0.1.0` and `0.2.0` AnCraft releases were signed with a throwaway
 > debug key; Dumpkin releases use a proper release key.
 
-Dumpkin releases share one package name and release key, so a newer APK (for example 0.4.0) installs over an older one and keeps your servers.
+Dumpkin releases share one package name and release key, so a newer APK (for example 0.5.0) installs over any earlier Dumpkin release (0.3.0 or later) and keeps your servers.
 
 ## Web dashboard
 
@@ -150,6 +152,10 @@ Shows what this phone can do and the settings that decide how well it hosts. It 
   while starting, so "Online" appears as soon as the port opens, then every 10 seconds.
 - **Console.** Output is published in batches instead of rebuilding the log list per line, which matters during the startup burst.
 - **Wi-Fi lock.** Uses the low-latency mode on Android 10+ (the old high-performance mode does nothing on Android 14+).
+- **Device tuning readings.** The processor name comes from `Build.SOC_MODEL` (Android 12+) and a small table of Snapdragon
+  codes, falling back to whatever the phone reports. Core speeds come from `/sys/devices/system/cpu/*/cpufreq`, so the line
+  is missing on phones that block it. Heat uses Android's thermal status (Android 10+) or the battery temperature on older
+  phones, and the Wi-Fi band comes from the connection's frequency.
 - **Why `targetSdk = 28`.** The engine is downloaded at runtime and run from app storage, which Android 10+ forbids for
   apps targeting API 29+. Like Termux, Dumpkin targets 28 and is meant to be sideloaded rather than published on Play. If a
   device still refuses a direct exec, the runtime retries through `/system/bin/linker64`.
