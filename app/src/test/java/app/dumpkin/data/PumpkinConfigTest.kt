@@ -38,6 +38,18 @@ class PumpkinConfigTest {
         assertEquals(Compression.Balanced, PumpkinConfig.pull(dir, p.copy(compression = Compression.Fast)).compression)
     }
 
+    @Test fun bedrockPortIsWrittenToTheNethernetAddressAndRoundTrips() {
+        val dir = tmp()
+        val p = ServerProfile(id = "t", name = "T", bedrock = true, bedrockPort = 19140)
+        PumpkinConfig.write(dir, p)
+        val t = PumpkinConfig.file(dir).readText()
+        assertEquals("true", Toml.read(t, "networking.bedrock", "enabled"))
+        assertEquals("0.0.0.0:19140", Toml.read(t, "networking.bedrock.nethernet", "address"))
+        val pulled = PumpkinConfig.pull(dir, p.copy(bedrockPort = 19132, bedrock = false))
+        assertEquals(19140, pulled.bedrockPort)
+        assertTrue(pulled.bedrock)
+    }
+
     @Test fun existingFileKeepsUnmanagedSettings() {
         val dir = tmp()
         PumpkinConfig.file(dir).writeText("[world]\nautosave_ticks = 123\n[networking.java.compression]\nthreshold = 999\n")

@@ -191,6 +191,26 @@ class WebApiTest {
         assertEquals(1, req("GET", "/api/servers", cookie = cookie).array.length())
     }
 
+    @Test fun several_bedrock_servers_can_coexist_on_different_ports() {
+        val cookie = login()
+        val a = createServer(cookie, "A", ""","bedrock":true""")
+        assertEquals(19132, a.getInt("bedrockPort")) // first free Bedrock port by default
+        val b = createServer(cookie, "B", ""","bedrock":true""")
+        assertEquals(19133, b.getInt("bedrockPort")) // next one is picked automatically
+        val c = createServer(cookie, "C", ""","bedrock":true,"bedrockPort":19200""")
+        assertEquals(19200, c.getInt("bedrockPort"))
+
+        val dup = req("POST", "/api/servers", """{"name":"D","bedrock":true,"bedrockPort":19200}""", cookie)
+        assertEquals(dup.body, 400, dup.status)
+        assertTrue(dup.json.getString("error").contains("Bedrock port", ignoreCase = true))
+        val clash = req("PATCH", "/api/servers/${b.getString("id")}", """{"bedrockPort":19132}""", cookie)
+        assertEquals(400, clash.status)
+        assertEquals(200, req("PATCH", "/api/servers/${b.getString("id")}", """{"bedrockPort":19300}""", cookie).status)
+        // Java ports are chosen to avoid Bedrock ports too
+        val ports = listOf(a, b, c).map { it.getInt("port") }
+        assertEquals(ports.size, ports.toSet().size)
+    }
+
     @Test fun start_stop_and_status_round_trip() {
         val cookie = login()
         val id = createServer(cookie).getString("id")

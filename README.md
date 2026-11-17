@@ -97,7 +97,7 @@ limit, which applies as soon as you save.
 | | Online mode | Verifies players with Microsoft accounts. Each join waits on a Mojang lookup; offline mode skips it but lets anyone use any name |
 | | **Fetch skins and capes** | On by default. Turn off to trim join work; players may show default skins |
 | | **Lightweight server-list ping** | On by default. Leaves the server icon out of the multiplayer-list response |
-| | Bedrock support | Experimental. Also listens on UDP 19132, which only one server can use |
+| | Bedrock support, **Bedrock port** | Experimental. Each server has its own Bedrock port (default 19132, then the next free one), so several Bedrock servers can run at once. Set it when creating a server or later in Settings |
 | Engine | Build to use | "Newest", or pin a specific installed build |
 
 ## Engine tab
@@ -186,6 +186,7 @@ Android Gradle Plugin 9+. Expect some API churn when you bump it.
 - `[networking.java.compression]`: `enabled`, `level`
 - `[networking.java.authentication.textures]`: `enabled`
 - `[networking.bedrock]`: `enabled`
+- `[networking.bedrock.nethernet]`: `address` (`0.0.0.0:<bedrock port>`)
 - `[commands]`: `use_tty = false`
 - First run only, all set to `false`: `[telemetry]`, `[networking.query]` and `[networking.management]` `enabled`
 

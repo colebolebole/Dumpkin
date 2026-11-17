@@ -40,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
@@ -59,7 +60,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.dumpkin.dumpkin
+import app.dumpkin.data.DEFAULT_BEDROCK_PORT
 import app.dumpkin.data.GameMode
+import app.dumpkin.data.ProfileRules
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.data.Status
 import app.dumpkin.server.ServerManager
@@ -132,7 +135,7 @@ fun HomeScreen(onOpen: (String) -> Unit, onOpenEngine: () -> Unit, snack: (Strin
 
     if (showCreate) {
         CreateServerSheet(
-            takenPorts = profiles.map { it.port }.toSet(),
+            existing = profiles,
             onDismiss = { showCreate = false },
             onCreate = {
                 app.manager.create(it)
@@ -249,22 +252,28 @@ private fun ServerCard(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun CreateServerSheet(
-    takenPorts: Set<Int>,
+    existing: List<ServerProfile>,
     onDismiss: () -> Unit,
     onCreate: (ServerProfile) -> Unit,
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val claimed = remember(existing) { ProfileRules.claimedPorts(existing) }
     var name by remember { mutableStateOf("My Pumpkin Server") }
-    var portText by remember {
-        mutableStateOf(generateSequence(25565) { it + 1 }.first { it !in takenPorts }.toString())
-    }
+    var portText by remember { mutableStateOf(ProfileRules.nextFreePort(claimed).toString()) }
     var mode by remember { mutableStateOf(GameMode.Survival) }
-    val port = portText.toIntOrNull()
-    val portError = when {
-        port == null || port !in 1024..65535 -> "Use a port between 1024 and 65535"
-        port in takenPorts -> "Another server already uses this port"
-        else -> null
+    var bedrock by remember { mutableStateOf(false) }
+    // Each server needs its own Bedrock port, so suggest the next one nobody uses.
+    var bedrockText by remember {
+        mutableStateOf(ProfileRules.nextFreePort(claimed + (portText.toIntOrNull() ?: 0), DEFAULT_BEDROCK_PORT).toString())
     }
+    val port = portText.toIntOrNull()
+    val bedrockPort = bedrockText.toIntOrNull()
+    // Validate through the same rules the settings screen and web API use.
+    val candidate = ServerProfile(
+        id = "new", name = name.trim(), port = port ?: -1, bedrock = bedrock, bedrockPort = bedrockPort ?: -1,
+    )
+    val portError = ProfileRules.javaPortError(candidate, existing)
+    val bedrockError = ProfileRules.bedrockPortError(candidate, existing)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         Column(
@@ -299,12 +308,40 @@ private fun CreateServerSheet(
                     ) { Text(m.label) }
                 }
             }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Bedrock support", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Experimental. Lets Bedrock players join on their own port.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = bedrock, onCheckedChange = { bedrock = it })
+            }
+            if (bedrock) {
+                OutlinedTextField(
+                    value = bedrockText,
+                    onValueChange = { bedrockText = it.filter(Char::isDigit).take(5) },
+                    label = { Text("Bedrock port") },
+                    isError = bedrockError != null,
+                    supportingText = { Text(bedrockError ?: "Bedrock players connect to your-ip:$bedrockText") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Spacer(Modifier.height(4.dp))
             Button(
                 onClick = {
-                    onCreate(ServerProfile(name = name.trim(), port = port!!, gameMode = mode))
+                    onCreate(
+                        ServerProfile(
+                            name = name.trim(), port = port!!, gameMode = mode,
+                            bedrock = bedrock, bedrockPort = bedrockPort ?: DEFAULT_BEDROCK_PORT,
+                        ),
+                    )
                 },
-                enabled = name.isNotBlank() && portError == null,
+                enabled = name.isNotBlank() && portError == null && bedrockError == null,
                 shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.fillMaxWidth().heightIn(min = ButtonDefaults.MediumContainerHeight),
             ) { Text("Create server") }

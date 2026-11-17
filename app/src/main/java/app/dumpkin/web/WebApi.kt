@@ -1,5 +1,6 @@
 package app.dumpkin.web
 
+import app.dumpkin.data.DEFAULT_BEDROCK_PORT
 import app.dumpkin.data.ProfilePatch
 import app.dumpkin.data.ProfileRules
 import app.dumpkin.data.RuntimeState
@@ -225,8 +226,11 @@ class WebApi(
         val existing = backend.profiles()
         if (existing.size >= MAX_SERVERS) throw ApiError(409, "That's the most servers this phone can manage ($MAX_SERVERS).")
         if (body.optString("name", "").isBlank()) throw ApiError(400, "Give the server a name.")
-        val port = ProfileRules.nextFreePort(existing.map { it.port }.toSet())
-        val profile = ProfilePatch.apply(ServerProfile(name = "New server", port = port), body)
+        val claimed = ProfileRules.claimedPorts(existing)
+        val port = ProfileRules.nextFreePort(claimed)
+        // Each server needs its own Bedrock port; offer the next free one unless the request picks one.
+        val bedrockPort = ProfileRules.nextFreePort(claimed + port, DEFAULT_BEDROCK_PORT)
+        val profile = ProfilePatch.apply(ServerProfile(name = "New server", port = port, bedrockPort = bedrockPort), body)
         validateProfile(profile, existing)
         backend.create(profile)
         return HttpResponse.json(201, serverJson(profile))

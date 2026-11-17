@@ -41,6 +41,37 @@ class ProfileRulesTest {
         assertEquals(25567, ProfileRules.nextFreePort(setOf(25565, 25566)))
     }
 
+    @Test fun bedrock_servers_need_different_bedrock_ports() {
+        val a = base.copy(bedrock = true, bedrockPort = 19132)
+        val b = ServerProfile(id = "b", name = "B", port = 25566, bedrock = true, bedrockPort = 19133)
+        assertNull(ProfileRules.validate(a, listOf(b))) // two Bedrock servers, different ports: fine
+        val clash = ProfileRules.validate(b.copy(bedrockPort = 19132), listOf(a))
+        assertTrue(clash!!, clash.contains("Bedrock port", true))
+        assertTrue(ProfileRules.validate(a.copy(bedrockPort = 25565), emptyList())!!.contains("differ", true))
+        assertNotNull(ProfileRules.validate(a.copy(bedrockPort = 80), emptyList()))
+        // a Java port may not collide with another server's Bedrock port, and vice versa
+        assertNotNull(ProfileRules.validate(b.copy(port = 19132), listOf(a)))
+        assertNotNull(ProfileRules.validate(a.copy(bedrockPort = 25566), listOf(b)))
+    }
+
+    @Test fun the_bedrock_port_is_ignored_while_bedrock_is_off() {
+        val off = base.copy(bedrock = false, bedrockPort = 1)
+        assertNull(ProfileRules.validate(off, emptyList()))
+        val other = ServerProfile(id = "b", name = "B", port = 25566, bedrock = true, bedrockPort = 19132)
+        assertNull(ProfileRules.validate(off.copy(bedrockPort = 19132), listOf(other)))
+        assertEquals(setOf(25565), ProfileRules.claimedPorts(listOf(base)))
+        assertEquals(setOf(25566, 19132), ProfileRules.claimedPorts(listOf(other)))
+    }
+
+    @Test fun bedrock_port_can_be_patched() {
+        val p = ProfilePatch.apply(base, JSONObject("""{"bedrock":true,"bedrockPort":19140}"""))
+        assertEquals(base.copy(bedrock = true, bedrockPort = 19140), p)
+        try {
+            ProfilePatch.apply(base, JSONObject("""{"bedrockPort":"x"}""")); fail("accepted text")
+        } catch (_: ProfilePatch.Invalid) {
+        }
+    }
+
     @Test fun patching_changes_only_the_fields_given() {
         val p = ProfilePatch.apply(base, JSONObject("""{"motd":"hi","port":25600,"gameMode":"CREATIVE","onlineMode":false,"compression":"off"}"""))
         assertEquals(base.copy(motd = "hi", port = 25600, gameMode = GameMode.Creative, onlineMode = false, compression = Compression.Off), p)

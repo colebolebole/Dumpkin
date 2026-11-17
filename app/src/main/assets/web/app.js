@@ -428,24 +428,38 @@
     let preset = PRESETS[0];
     const name = h('input', { class: 'input', value: 'My Pumpkin Server', maxlength: '40', 'aria-label': 'Name' });
     const nameField = field('Name', name);
+    // Bedrock servers each need their own port: suggest the lowest one no server has claimed (Java or Bedrock).
+    let bedrock = false;
+    const claimed = new Set();
+    state.servers.forEach((s) => { claimed.add(s.port); if (s.bedrock) claimed.add(s.bedrockPort); });
+    let suggested = 19132;
+    while (claimed.has(suggested)) suggested++;
+    const bedrockPort = h('input', { class: 'input', type: 'number', inputmode: 'numeric', value: suggested, 'aria-label': 'Bedrock port' });
+    const bedrockField = field('Bedrock port', bedrockPort);
+    bedrockField.hidden = true;
     dialog((close) => {
       const create = h('button', { class: 'btn', type: 'submit' }, 'Create server');
       return h('form', { class: 'dlg', onsubmit: async (ev) => {
         ev.preventDefault();
         if (!name.value.trim()) { nameField.error('Give the server a name.'); return; }
+        const body = { name: name.value.trim(), gameMode: mode, viewDistance: preset.view, simulationDistance: preset.sim };
+        if (bedrock) { body.bedrock = true; body.bedrockPort = Number(bedrockPort.value); }
         create.disabled = true;
         try {
-          const s = await api('POST', '/api/servers', { name: name.value.trim(), gameMode: mode, viewDistance: preset.view, simulationDistance: preset.sim });
+          const s = await api('POST', '/api/servers', body);
           close(true);
           await refreshNow();
           go('#/server/' + encodeURIComponent(s.id));
-        } catch (e) { nameField.error(e.message); create.disabled = false; }
+        } catch (e) { (bedrock ? bedrockField : nameField).error(e.message); create.disabled = false; }
       } },
         h('h2', {}, 'New server'),
         nameField,
         h('div', { class: 'field' }, h('div', { class: 'label' }, 'Game mode'), seg(GAME_MODES.map((m) => ({ value: m, label: m })), mode, (v) => { mode = v; })),
         h('div', { class: 'field' }, h('div', { class: 'label' }, 'Distance'), seg(PRESETS.map((p) => ({ value: p, label: p.label })), preset, (v) => { preset = v; }),
           h('div', { class: 'hint' }, 'Fewer chunks means a faster join on a phone. You can change this later.')),
+        switchRow('Bedrock support (experimental)', 'Lets Bedrock players join on their own port.', false,
+          (v) => { bedrock = v; bedrockField.hidden = !v; bedrockField.error(''); }),
+        bedrockField,
         h('div', { class: 'actions' },
           h('button', { class: 'btn outline', type: 'button', onclick: () => close(false) }, 'Cancel'), create));
     });
@@ -598,7 +612,7 @@
   // ---- settings
   function settingsPanel(server) {
     const id = server.id;
-    const KEYS = ['name', 'motd', 'port', 'maxPlayers', 'viewDistance', 'simulationDistance', 'gameMode', 'difficulty', 'onlineMode', 'bedrock',
+    const KEYS = ['name', 'motd', 'port', 'maxPlayers', 'viewDistance', 'simulationDistance', 'gameMode', 'difficulty', 'onlineMode', 'bedrock', 'bedrockPort',
       'memoryLimitMb', 'memoryAction', 'cpuThreads', 'autoRestart', 'lightPing', 'compression', 'fetchSkins', 'engineId'];
     const pick = (s) => Object.fromEntries(KEYS.map((k) => [k, s[k]]));
     let baseline = pick(server);
@@ -620,6 +634,13 @@
       if (!nameOk) p.name = 'Give the server a name (up to 40 characters).';
       if (!Number.isInteger(draft.port) || draft.port < 1024 || draft.port > 65535) p.port = 'Use a port between 1024 and 65535.';
       else if (state.servers.some((s) => s.id !== id && s.port === draft.port)) p.port = 'Another server already uses this port.';
+      else if (state.servers.some((s) => s.id !== id && s.bedrock && s.bedrockPort === draft.port)) p.port = 'Another server uses this port for Bedrock.';
+      if (draft.bedrock) {
+        if (!Number.isInteger(draft.bedrockPort) || draft.bedrockPort < 1024 || draft.bedrockPort > 65535) p.bedrockPort = 'Use a port between 1024 and 65535.';
+        else if (draft.bedrockPort === draft.port) p.bedrockPort = 'Must differ from the Java port.';
+        else if (state.servers.some((s) => s.id !== id && s.bedrock && s.bedrockPort === draft.bedrockPort)) p.bedrockPort = 'Another server already uses this Bedrock port.';
+        else if (state.servers.some((s) => s.id !== id && s.port === draft.bedrockPort)) p.bedrockPort = 'Another server uses this port for Java.';
+      }
       if (!Number.isInteger(draft.maxPlayers) || draft.maxPlayers < 1 || draft.maxPlayers > 1000) p.maxPlayers = '1 to 1000.';
       return p;
     }
@@ -656,7 +677,7 @@
       };
       const number = (key, label) => {
         const input = h('input', { class: 'input', type: 'number', inputmode: 'numeric', value: draft[key], 'aria-label': label,
-          oninput: () => { set(key, input.value === '' ? NaN : Number(input.value)); showProblems({ [key]: fields[key] }); } });
+          oninput: () => { set(key, input.value === '' ? NaN : Number(input.value)); showProblems(fields); } });
         return fields[key] = field(label, input);
       };
       const fields = {};
@@ -678,6 +699,19 @@
         }
       };
       buildLimit();
+
+      // The Bedrock port only matters (and is only checked) while Bedrock is switched on.
+      const bedrockSlot = h('div', { class: 'fields' });
+      const buildBedrock = () => {
+        bedrockSlot.replaceChildren();
+        delete fields.bedrockPort;
+        if (draft.bedrock) {
+          bedrockSlot.append(number('bedrockPort', 'Bedrock port'),
+            h('div', { class: 'hint wide' }, 'Bedrock players connect to this port. Give every server its own to run several at once.'));
+          showProblems({ bedrockPort: fields.bedrockPort });
+        }
+      };
+      buildBedrock();
 
       const engines = [{ value: null, label: 'Newest' }, ...state.engine.installed.map((e) => ({ value: e.id, label: e.label }))];
       const threads = [{ value: 0, label: 'Auto' }, ...Array.from({ length: dev.cores }, (_, i) => ({ value: i + 1, label: String(i + 1) }))];
@@ -709,7 +743,8 @@
           switchRow('Online mode', 'Verify players with Microsoft accounts. Each join waits on a Mojang lookup; offline mode skips it but lets anyone use any name.', draft.onlineMode, (v) => set('onlineMode', v)),
           switchRow('Fetch skins and capes', 'Turn off to trim work during joins. Players may show default skins.', draft.fetchSkins, (v) => set('fetchSkins', v)),
           switchRow('Lightweight server-list ping', 'Leaves the server icon out of the multiplayer list response so it loads faster.', draft.lightPing, (v) => set('lightPing', v)),
-          switchRow('Bedrock support (experimental)', 'Also listens on UDP 19132, which only one server can use.', draft.bedrock, (v) => set('bedrock', v))),
+          switchRow('Bedrock support (experimental)', 'Lets Bedrock players join on their own port.', draft.bedrock, (v) => { set('bedrock', v); buildBedrock(); }),
+          bedrockSlot),
         h('div', { class: 'card' }, h('h2', {}, 'Engine'),
           state.engine.installed.length
             ? seg(engines, draft.engineId, (v) => set('engineId', v))

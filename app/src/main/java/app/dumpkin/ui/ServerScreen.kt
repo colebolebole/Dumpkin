@@ -95,6 +95,7 @@ import app.dumpkin.data.deviceMemory
 import app.dumpkin.data.DistancePreset
 import app.dumpkin.data.GameMode
 import app.dumpkin.data.MemoryAction
+import app.dumpkin.data.ProfileRules
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.data.Status
 import app.dumpkin.server.ServerManager
@@ -383,21 +384,21 @@ private fun SettingsPane(
     var baseline by remember(profile.id) { mutableStateOf(app.manager.pullConfig(profile)) }
     var draft by remember(profile.id) { mutableStateOf(baseline) }
     var portText by remember(profile.id) { mutableStateOf(baseline.port.toString()) }
+    var bedrockText by remember(profile.id) { mutableStateOf(baseline.bedrockPort.toString()) }
     var maxText by remember(profile.id) { mutableStateOf(baseline.maxPlayers.toString()) }
     var showRaw by remember { mutableStateOf(false) }
     var showReset by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
 
     val port = portText.toIntOrNull()
+    val bedrockPort = bedrockText.toIntOrNull()
     val maxPlayers = maxText.toIntOrNull()
-    val portError = when {
-        port == null || port !in 1024..65535 -> "Use a port between 1024 and 65535"
-        all.any { it.id != profile.id && it.port == port } -> "Another server already uses this port"
-        else -> null
-    }
     val maxError = if (maxPlayers == null || maxPlayers !in 1..1000) "1 to 1000" else null
-    val candidate = draft.copy(port = port ?: -1, maxPlayers = maxPlayers ?: -1)
-    val valid = portError == null && maxError == null && draft.name.isNotBlank()
+    val candidate = draft.copy(port = port ?: -1, bedrockPort = bedrockPort ?: -1, maxPlayers = maxPlayers ?: -1)
+    // Same rules the web dashboard enforces, so both front ends reject the same clashes.
+    val portError = ProfileRules.javaPortError(candidate, all)
+    val bedrockError = ProfileRules.bedrockPortError(candidate, all)
+    val valid = portError == null && bedrockError == null && maxError == null && draft.name.isNotBlank()
     val dirty = candidate != baseline
 
     Column(
@@ -581,9 +582,21 @@ private fun SettingsPane(
         ) { draft = draft.copy(lightPing = it) }
         SwitchRow(
             "Bedrock support (experimental)",
-            "Also listen on UDP 19132 so Bedrock players can join. Only one server can use it at a time.",
+            "Lets Bedrock players join on their own port. Give each server a different Bedrock port to run several at once.",
             draft.bedrock,
         ) { draft = draft.copy(bedrock = it) }
+        if (draft.bedrock) {
+            OutlinedTextField(
+                value = bedrockText,
+                onValueChange = { bedrockText = it.filter(Char::isDigit).take(5) },
+                label = { Text("Bedrock port") },
+                isError = bedrockError != null,
+                supportingText = { Text(bedrockError ?: "Bedrock players connect to your-ip:$bedrockText") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         SectionTitle("Engine")
         if (engines.installed.isEmpty()) {
@@ -670,6 +683,7 @@ private fun SettingsPane(
                     val pulled = app.manager.pullConfig(profile)
                     baseline = pulled; draft = pulled
                     portText = pulled.port.toString(); maxText = pulled.maxPlayers.toString()
+                    bedrockText = pulled.bedrockPort.toString()
                     app.manager.update(pulled)
                     showRaw = false
                     snack("Configuration saved")

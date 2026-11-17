@@ -101,6 +101,8 @@ object PumpkinConfig {
             add(Toml.Edit("networking.java", "simulation_distance", p.simulationDistance.toString()))
             add(Toml.Edit("networking.java", "motd", Toml.q(p.motd)))
             add(Toml.Edit("networking.bedrock", "enabled", p.bedrock.toString()))
+            // Bedrock listens on its own address; each server needs a different port to run side by side.
+            add(Toml.Edit("networking.bedrock.nethernet", "address", Toml.q("0.0.0.0:${p.bedrockPort}")))
             // The console is driven over a pipe, not a terminal.
             add(Toml.Edit("commands", "use_tty", "false"))
             // Join speed: compression is the CPU-heavy part of sending chunks. All values are within Pumpkin's
@@ -140,6 +142,7 @@ object PumpkinConfig {
             simulationDistance = s("networking.java", "simulation_distance")?.toIntOrNull() ?: p.simulationDistance,
             onlineMode = s("networking.java", "online_mode")?.toBooleanStrictOrNull() ?: p.onlineMode,
             bedrock = s("networking.bedrock", "enabled")?.toBooleanStrictOrNull() ?: p.bedrock,
+            bedrockPort = s("networking.bedrock.nethernet", "address")?.substringAfterLast(':')?.toIntOrNull() ?: p.bedrockPort,
             lightPing = s("", "use_favicon")?.toBooleanStrictOrNull()?.not() ?: p.lightPing,
             fetchSkins = s("networking.java.authentication.textures", "enabled")?.toBooleanStrictOrNull() ?: p.fetchSkins,
             compression = when {

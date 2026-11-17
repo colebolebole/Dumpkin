@@ -32,6 +32,8 @@ enum class MemoryAction(val label: String) {
     Warn("Warn only"), Restart("Restart server")
 }
 
+const val DEFAULT_BEDROCK_PORT = 19132
+
 /** Everything Dumpkin remembers about one hosted server. The world itself lives in the server folder. */
 data class ServerProfile(
     val id: String = UUID.randomUUID().toString().take(8),
@@ -45,6 +47,8 @@ data class ServerProfile(
     val difficulty: Difficulty = Difficulty.Normal,
     val onlineMode: Boolean = true,
     val bedrock: Boolean = false,
+    /** Port Bedrock players connect to (Pumpkin's `[networking.bedrock.nethernet] address`). Only used when [bedrock] is on. */
+    val bedrockPort: Int = DEFAULT_BEDROCK_PORT,
     /** Installed engine build to use; null = newest installed. */
     val engineId: String? = null,
     /** Soft RAM cap in MB, enforced by watching the process's resident memory. 0 = no limit. */
@@ -71,6 +75,7 @@ data class ServerProfile(
         put("difficulty", difficulty.name)
         put("onlineMode", onlineMode)
         put("bedrock", bedrock)
+        put("bedrockPort", bedrockPort)
         put("engineId", engineId ?: "")
         put("memoryLimitMb", memoryLimitMb)
         put("memoryAction", memoryAction.name)
@@ -94,6 +99,7 @@ data class ServerProfile(
             difficulty = Difficulty.entries.firstOrNull { it.name == o.optString("difficulty") } ?: Difficulty.Normal,
             onlineMode = o.optBoolean("onlineMode", true),
             bedrock = o.optBoolean("bedrock", false),
+            bedrockPort = o.optInt("bedrockPort", DEFAULT_BEDROCK_PORT),
             engineId = o.optString("engineId").ifBlank { null },
             memoryLimitMb = o.optInt("memoryLimitMb", 0),
             memoryAction = MemoryAction.entries.firstOrNull { it.name == o.optString("memoryAction") } ?: MemoryAction.Warn,
