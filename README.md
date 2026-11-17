@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/colebolebole/Dumpkin/releases"><img alt="Version 0.5.0-alpha" src="https://img.shields.io/badge/version-0.5.0--alpha-F58220"></a>
+  <a href="https://github.com/colebolebole/Dumpkin/releases"><img alt="Version 0.5.1-alpha" src="https://img.shields.io/badge/version-0.5.1--alpha-F58220"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2EA44F"></a>
   <img alt="Android 8.0 and newer" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
   <img alt="arm64 only" src="https://img.shields.io/badge/CPU-arm64-0091BD?logo=arm&logoColor=white">
