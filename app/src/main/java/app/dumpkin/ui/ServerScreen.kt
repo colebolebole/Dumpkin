@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import app.dumpkin.dumpkin
 import app.dumpkin.data.Compression
 import app.dumpkin.data.Difficulty
+import app.dumpkin.data.DeviceTuning
 import app.dumpkin.data.deviceMemory
 import app.dumpkin.data.DistancePreset
 import app.dumpkin.data.GameMode
@@ -492,7 +493,7 @@ private fun SettingsPane(
         val ctx = LocalContext.current
         val mem = remember { deviceMemory(ctx) }
         val cores = remember { Runtime.getRuntime().availableProcessors() }
-        val maxLimit = (((mem.totalMb * 0.75).toInt()) / 128 * 128).coerceAtLeast(512)
+        val maxLimit = remember(mem.totalMb) { DeviceTuning.memoryAdvice(mem.totalMb).maxMb }
         Text(
             "This phone has ${formatMb(mem.totalMb)} of RAM, ${formatMb(mem.availMb)} free right now.",
             style = MaterialTheme.typography.bodySmall,

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -65,6 +66,12 @@ fun AppRoot() {
                     ShortNavigationBarItem(
                         selected = tab == 2,
                         onClick = { tab = 2 },
+                        icon = { Icon(Icons.Rounded.Tune, null) },
+                        label = { Text("Tuning") },
+                    )
+                    ShortNavigationBarItem(
+                        selected = tab == 3,
+                        onClick = { tab = 3 },
                         icon = { Icon(Icons.Rounded.Language, null) },
                         label = { Text("Dashboard") },
                     )
@@ -88,6 +95,7 @@ fun AppRoot() {
                     id != null -> ServerScreen(id = id, onBack = { openId = null })
                     tab == 0 -> HomeScreen(onOpen = { openId = it }, onOpenEngine = { tab = 1 }, snack = snack)
                     tab == 1 -> EngineScreen()
+                    tab == 2 -> TuningScreen()
                     else -> WebScreen(snack = snack)
                 }
             }

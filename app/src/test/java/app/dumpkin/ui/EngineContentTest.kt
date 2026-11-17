@@ -30,8 +30,7 @@ class EngineContentTest {
 
     private fun show(state: EngineUiState, supported: Boolean = true) = rule.setContent {
         DumpkinTheme {
-            EngineContent(state, supported, serversActive = false, keepScreenOn = false,
-                onCheck = {}, onDownload = {}, onDelete = {}, onKeepScreenOn = {})
+            EngineContent(state, supported, serversActive = false, onCheck = {}, onDownload = {}, onDelete = {})
         }
     }
 

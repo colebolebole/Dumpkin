@@ -21,6 +21,7 @@
 - **Live console.** Send commands and watch players, uptime and RAM use. Tap the command box and the console takes over the whole screen; close the keyboard and everything comes back.
 - **Roomy settings.** The status card rolls up as you scroll down the settings and returns as soon as you scroll up.
 - **Tuned for phones.** Memory limit, CPU threads, crash auto-restart, and join-speed settings (see below).
+- **Device tuning.** A tab that shows your phone's processor, memory, battery and heat, and checks the Android settings that affect hosting (see [Device tuning tab](#device-tuning-tab)).
 - **Settings that edit `pumpkin.toml` in place**, plus a raw editor for everything else.
 - **Shows the address** players should connect to on your network.
 
@@ -118,11 +119,25 @@ server's Java or Bedrock port. Servers that already used Bedrock keep 19132. The
 ## Engine tab
 
 - **Installed** and **Available on GitHub** builds, with download progress and delete.
-- **Keep servers alive.** Shortcut to Android's "ignore battery optimisation" prompt so servers aren't frozen when the screen is off.
-- **Keep screen on while hosting.** Android only grants its low-latency Wi-Fi mode while the screen is on, so this gives
-  players the lowest ping at the cost of battery. Plug the phone in.
-- **Tips.** Use 5 GHz Wi-Fi, keep the phone cool and lower view distance. Nightly builds are fully optimised; Canary skips
-  link-time optimisation and runs slower.
+- **Channels.** Nightly builds are fully optimised; Canary skips link-time optimisation and runs slower.
+
+## Device tuning tab
+
+Shows what this phone can do and the settings that decide how well it hosts. It refreshes every couple of seconds.
+
+- **This device.** Model, processor (for example *Snapdragon 8+ Gen 1*), core count and architecture, the speed of each core
+  cluster, Android version, battery, heat, and the address players connect to.
+- **Memory.** A bar of RAM in use and free, and how much to give servers: up to 75% of the phone's RAM (the same ceiling as
+  a server's memory limit), with guidance on what is comfortable.
+- **Checks.** A banner counts the settings that could hold your server back, and each card opens to an explanation and a
+  button that takes you to the right Android screen:
+  - **Battery optimisation.** Android freezes background apps, so allow Dumpkin to ignore it or servers drop out when the screen is off.
+  - **Notifications.** Needed to see running servers and use the Stop all button.
+  - **Wi-Fi.** Flags 2.4 GHz (use 5 GHz for lower ping) or no network address.
+  - **Temperature** and **free memory.** Hot or low-memory phones throttle or lose background apps.
+- **Hosting.** **Keep screen on while hosting**: Android only grants its low-latency Wi-Fi mode while the screen is on, so
+  this gives players the lowest ping at the cost of battery. Plug the phone in.
+- **Developer options & system.** Shortcuts to Android's battery, Wi-Fi, developer options and app info screens.
 
 ## How it works
 

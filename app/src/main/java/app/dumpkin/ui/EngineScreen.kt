@@ -61,7 +61,6 @@ fun EngineScreen() {
     val app = LocalContext.current.dumpkin
     val state by app.engines.state.collectAsState()
     val active by app.manager.active.collectAsState()
-    val keepOn by app.keepScreenOn.collectAsState()
 
     LaunchedEffect(Unit) { if (state.remote.isEmpty()) app.engines.checkRemote() }
 
@@ -69,11 +68,9 @@ fun EngineScreen() {
         state = state,
         supported = app.engines.supported,
         serversActive = active.isNotEmpty(),
-        keepScreenOn = keepOn,
         onCheck = { app.engines.checkRemote() },
         onDownload = { app.engines.download(it) },
         onDelete = { app.engines.delete(it) },
-        onKeepScreenOn = { app.setKeepScreenOn(it) },
     )
 }
 
@@ -84,16 +81,13 @@ fun EngineContent(
     state: EngineUiState,
     supported: Boolean,
     serversActive: Boolean,
-    keepScreenOn: Boolean,
     onCheck: () -> Unit,
     onDownload: (RemoteEngine) -> Unit,
     onDelete: (String) -> Unit,
-    onKeepScreenOn: (Boolean) -> Unit,
 ) {
     val ctx = LocalContext.current
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var confirmDelete by remember { mutableStateOf<InstalledEngine?>(null) }
-    var batteryOk by remember { mutableStateOf(isIgnoringBattery(ctx)) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -169,73 +163,12 @@ fun EngineContent(
                 item { Text("Tap refresh to look for builds.", style = MaterialTheme.typography.bodyMedium) }
             }
 
-            item { Header("Keep servers alive") }
             item {
-                Card(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                ) {
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            "Android may freeze background apps to save battery. Allowing Dumpkin to ignore battery optimisation stops your server from dropping out when the screen is off.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        if (batteryOk) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Check, null)
-                                Spacer(Modifier.size(8.dp))
-                                Text("Unrestricted — you're all set", style = MaterialTheme.typography.labelLarge)
-                            }
-                        } else {
-                            FilledTonalButton(
-                                onClick = {
-                                    runCatching {
-                                        ctx.startActivity(
-                                            Intent(
-                                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                                Uri.parse("package:${ctx.packageName}"),
-                                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        )
-                                    }
-                                    batteryOk = isIgnoringBattery(ctx)
-                                },
-                                shapes = ButtonDefaults.shapes(),
-                            ) {
-                                Icon(Icons.Rounded.BatteryChargingFull, null, Modifier.size(ButtonDefaults.IconSize))
-                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text("Allow")
-                            }
-                        }
-                    }
-                }
-            }
-
-            item { Header("Ping and performance") }
-            item {
-                Card(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                ) {
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Keep screen on while hosting", style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    "Android only gives apps its low-latency Wi-Fi mode while the screen is on, so this gives players the lowest ping. Costs battery; plug the phone in.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Spacer(Modifier.size(16.dp))
-                            Switch(checked = keepScreenOn, onCheckedChange = onKeepScreenOn)
-                        }
-                        Text(
-                            "Tips: use 5 GHz Wi-Fi, keep the phone cool, and lower view distance in a server's settings. Nightly builds are fully optimised; Canary skips link-time optimisation and runs slower.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                InfoCard(
+                    "Looking for battery and ping settings?",
+                    "They moved to the Device tuning tab, along with your phone's memory, heat and Wi-Fi checks.",
+                    error = false,
+                )
             }
 
             item { Header("About") }
@@ -274,10 +207,6 @@ fun EngineContent(
         )
     }
 }
-
-private fun isIgnoringBattery(ctx: android.content.Context): Boolean =
-    (ctx.getSystemService(android.content.Context.POWER_SERVICE) as PowerManager)
-        .isIgnoringBatteryOptimizations(ctx.packageName)
 
 @Composable
 private fun Header(text: String) {
