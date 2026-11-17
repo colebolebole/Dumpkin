@@ -18,7 +18,7 @@ android {
         // (same approach Termux uses), so this app is meant to be sideloaded, not published on Play.
         targetSdk = 28
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.1.0-alpha"
     }
 
     buildTypes {
