@@ -68,6 +68,11 @@
     return ss + 's';
   }
   const isActive = (s) => s.status === 'starting' || s.status === 'running' || s.status === 'stopping';
+  // A restart goes stopping, then offline for a moment, then starting. Show it as one steady "restarting" state.
+  const isRestarting = (s) => s.restarting === true;
+  const isBusy = (s) => s.status === 'starting' || s.status === 'stopping' || isRestarting(s);
+  const statusText = (s) => (isRestarting(s) ? 'Restarting…' : STATUS[s.status]);
+  const visualStatus = (s) => (isRestarting(s) ? 'starting' : s.status);
 
   function toast(message, kind) {
     const t = h('div', { class: 'toast' + (kind === 'error' ? ' error' : ''), role: kind === 'error' ? 'alert' : 'status' }, message);
@@ -367,11 +372,11 @@
       const c = cards.get(s.id);
       c.data = s;
       c.el.classList.toggle('is-running', s.status === 'running');
-      setBlob(c.blob, s.status);
+      setBlob(c.blob, visualStatus(s));
       c.name.textContent = s.name;
-      c.stateEl.textContent = STATUS[s.status] + (s.status === 'running' ? ' · ' + s.online + '/' + s.max + ' players' : '');
+      c.stateEl.textContent = statusText(s) + (s.status === 'running' ? ' · ' + s.online + '/' + s.max + ' players' : '');
       c.meta.textContent = 'Port ' + s.port + ' · ' + s.gameMode + ' · ' + s.difficulty;
-      const busy = s.status === 'starting' || s.status === 'stopping';
+      const busy = isBusy(s);
       c.power.className = 'power' + (isActive(s) ? ' stop' : '');
       c.power.disabled = busy;
       c.power.setAttribute('aria-label', (isActive(s) ? 'Stop ' : 'Start ') + s.name);
@@ -409,9 +414,26 @@
   }
 
   async function toggleServer(s, btn) {
+    await serverAction(s, isActive(s) ? '/stop' : '/start', btn);
+  }
+
+  async function restartServer(s, btn) {
+    if (s.online > 0) {
+      // Restarting disconnects everyone, so check first if anyone is playing.
+      const ok = await confirmDialog({
+        title: 'Restart "' + s.name + '"?',
+        body: s.online + (s.online === 1 ? ' player is' : ' players are') + ' online and will be disconnected. The server comes back in a few seconds.',
+        confirm: 'Restart',
+      });
+      if (!ok) return;
+    }
+    await serverAction(s, '/restart', btn);
+  }
+
+  async function serverAction(s, path, btn) {
     if (btn) btn.disabled = true;
     try {
-      const updated = await api('POST', '/api/servers/' + encodeURIComponent(s.id) + (isActive(s) ? '/stop' : '/start'));
+      const updated = await api('POST', '/api/servers/' + encodeURIComponent(s.id) + path);
       const i = state.servers.findIndex((x) => x.id === s.id);
       if (i >= 0) state.servers[i] = updated;
       if (view) view.update();
@@ -489,21 +511,25 @@
       refs.copy = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Copy address', onclick: () => copyText(refs.addrText.textContent) }, icon('copy', 'sm'));
       refs.addr = h('span', { class: 'addr' }, refs.addrText, refs.copy);
       refs.power = h('button', { class: 'btn big', type: 'button', onclick: () => toggleServer(serverById(id), refs.power) });
+      refs.restart = h('button', { class: 'btn big outline', type: 'button', hidden: true,
+        onclick: () => restartServer(serverById(id), refs.restart) }, icon('refresh'), 'Restart');
       refs.memBar = h('i');
       refs.memText = h('span');
       refs.mem = h('div', { class: 'mem-line', hidden: true }, refs.memText, h('div', { class: 'meter' }, refs.memBar));
       hero.append(refs.blob, h('div', {}, refs.title, refs.state, refs.detail),
-        h('div', { class: 'actions' }, refs.power, refs.addr, refs.mem));
+        h('div', { class: 'actions' }, refs.power, refs.restart, refs.addr, refs.mem));
     }
     buildHero();
 
     function updateHero(s) {
-      setBlob(refs.blob, s.status, true);
-      hero.className = 'card hero ' + s.status;
+      setBlob(refs.blob, visualStatus(s), true);
+      hero.className = 'card hero ' + visualStatus(s);
       refs.title.textContent = s.name;
-      refs.state.textContent = STATUS[s.status];
+      refs.state.textContent = statusText(s);
       const bits = [];
-      if (s.status === 'running') {
+      if (isRestarting(s)) {
+        bits.push('Back in a few seconds, with your latest settings');
+      } else if (s.status === 'running') {
         bits.push(s.online + '/' + s.max + ' players');
         bits.push('up ' + fmtDuration(state.now - s.startedAt + (Date.now() - fetchedAt)));
         if (s.version) bits.push('Minecraft ' + s.version);
@@ -511,11 +537,13 @@
       else if (s.status === 'stopped') bits.push('Start it, then players can join at the address below.');
       refs.detail.textContent = bits.join(' · ');
       refs.addrText.textContent = addressFor(s);
-      const busy = s.status === 'starting' || s.status === 'stopping';
+      const busy = isBusy(s);
       refs.power.className = 'btn big ' + (isActive(s) ? 'danger' : '');
       refs.power.disabled = busy;
       refs.power.replaceChildren(busy ? icon('refresh', 'spin') : icon(isActive(s) ? 'stop' : 'play'),
-        busy ? STATUS[s.status] : isActive(s) ? 'Stop server' : 'Start server');
+        busy ? statusText(s) : isActive(s) ? 'Stop server' : 'Start server');
+      refs.restart.hidden = !(s.status === 'running' && !busy);
+      refs.restart.disabled = busy;
       refs.mem.hidden = !(isActive(s) && s.rssMb > 0);
       if (!refs.mem.hidden) {
         refs.memText.textContent = 'Memory ' + fmtMb(s.rssMb) + (s.memoryLimitMb > 0 ? ' / ' + fmtMb(s.memoryLimitMb) : '');

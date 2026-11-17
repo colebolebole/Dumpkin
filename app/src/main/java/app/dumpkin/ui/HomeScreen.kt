@@ -217,11 +217,11 @@ private fun ServerCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            StatusBlob(st.status, 64.dp)
+            StatusBlob(st.displayStatus, 64.dp)
             Column(Modifier.weight(1f)) {
                 Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    statusLabel(st.status) + if (running) " · ${st.online}/${st.max} players" else "",
+                    statusLabel(st) + if (running) " · ${st.online}/${st.max} players" else "",
                     style = MaterialTheme.typography.labelLarge,
                     color = if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -231,7 +231,7 @@ private fun ServerCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            when (st.status) {
+            when (st.displayStatus) {
                 Status.Starting, Status.Stopping -> ContainedLoadingIndicator(Modifier.size(56.dp))
                 else -> FilledIconButton(
                     onClick = onToggle,

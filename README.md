@@ -37,6 +37,7 @@
 - **One-tap engine.** Downloads the official `pumpkin-aarch64-android` build (Stable, Canary or Nightly) from Pumpkin's GitHub releases.
 - **Web dashboard.** Turn it on and create, start, stop and manage servers from a browser on your PC or another phone: console, every setting, the config file and engine downloads. Password protected (see [Web dashboard](#web-dashboard)).
 - **Multiple servers.** Each has its own folder, port, world and `pumpkin.toml`.
+- **One-tap restart.** Restart a running server from the app or the web dashboard to apply new settings. It asks first if players are online.
 - **Bedrock on every server.** Each server can have its own Bedrock port, so several Bedrock servers run side by side (see [Bedrock servers](#bedrock-servers)).
 - **Runs in the background.** A foreground service with a wake lock and low-latency Wi-Fi lock keeps servers up, with a "Stop all" button in the notification.
 - **Live console.** Send commands and watch players, uptime and RAM use. Tap the command box and the console takes over the whole screen; close the keyboard and everything comes back.
@@ -102,7 +103,7 @@ Open the **Dashboard** tab in the app and turn the switch on. Dumpkin starts a s
 `8080` by default). It shows its address, for example `http://192.168.0.83:8080`; open that in a browser on any device on
 the same Wi-Fi, sign in with the password from the same tab, and you can:
 
-- create, start, stop and delete servers, with a live status for each
+- create, start, stop, restart and delete servers, with a live status for each
 - watch the console and send commands
 - change every setting from the table below, and edit `pumpkin.toml` directly
 - download, update and remove engine builds
@@ -130,7 +131,7 @@ Everything the page does goes through a JSON API, so you can script it. Sign in 
 | `GET /api/state` | Phone info, engine builds and every server with its status |
 | `POST /api/servers` | Create a server (`name` plus any setting, such as `bedrock` and `bedrockPort`) |
 | `GET`, `PATCH`, `DELETE /api/servers/{id}` | Read, change or delete a server (delete only while stopped) |
-| `POST /api/servers/{id}/start`, `/stop` | Start or stop it |
+| `POST /api/servers/{id}/start`, `/stop`, `/restart` | Start, stop or restart it (restarting a stopped server starts it). While a restart is under way the server reports `"restarting": true` |
 | `POST /api/servers/{id}/command` | Send a console command (`{"command": "list"}`) |
 | `GET /api/servers/{id}/logs?after=N` | Console lines after line `N`; `reset` is true if you must start over |
 | `GET`, `PUT /api/servers/{id}/config`, `POST .../config/reset` | Read, write or reset `pumpkin.toml` |
@@ -140,8 +141,8 @@ Everything the page does goes through a JSON API, so you can script it. Sign in 
 
 ## Server settings
 
-Open a server and switch to the **Settings** tab. Changes to a running server apply after a restart, except the memory
-limit, which applies as soon as you save.
+Open a server and switch to the **Settings** tab. Changes to a running server apply after a restart (use the
+**Restart** button on the server screen), except the memory limit, which applies as soon as you save.
 
 | Section | Setting | What it does |
 | --- | --- | --- |

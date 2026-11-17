@@ -48,7 +48,10 @@ class ServerManager(private val app: Application, private val engines: EngineMan
                     }
                 },
                 onRestart = { rid ->
-                    start(rid)?.let { runtimes[rid]?.appendLog("✖ Could not restart: $it") }
+                    start(rid)?.let {
+                        runtimes[rid]?.appendLog("✖ Could not restart: $it")
+                        runtimes[rid]?.clearRestarting()
+                    }
                 },
             )
         }
@@ -116,6 +119,16 @@ class ServerManager(private val app: Application, private val engines: EngineMan
 
     fun stop(id: String) {
         runtimes[id]?.stop()
+    }
+
+    /**
+     * Restarts a running server so it picks up changed settings; a server that is not running is simply started.
+     * @return null on success, otherwise a message to show the user.
+     */
+    fun restart(id: String): String? {
+        val rt = runtime(id) ?: return "That server no longer exists."
+        if (!rt.state.value.isActive) return start(id)
+        return if (rt.restart()) null else "The server is still launching. Try again in a moment."
     }
 
     fun stopAll() {

@@ -87,6 +87,20 @@ class FakeBackend(private val instant: Boolean = true) : WebBackend {
         }
     }
 
+    override fun restart(id: String): String? {
+        val cur = states[id]
+        if (cur?.isActive != true) return start(id)
+        if (cur.status == Status.Starting) return "The server is still launching. Try again in a moment."
+        states[id] = cur.copy(status = Status.Stopping, restarting = true)
+        log(id, "↻ Restart requested", "■ Stopping…")
+        later(1200) {
+            states[id] = RuntimeState(Status.Stopped, restarting = true)
+            log(id, "■ Process exited with code 0", "↻ Restarting…")
+            later(800) { start(id) }
+        }
+        return null
+    }
+
     override fun command(id: String, command: String) {
         sentCommands.add("$id:$command")
         log(id, "> $command")

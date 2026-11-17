@@ -36,6 +36,12 @@ interface WebBackend {
     /** @return null on success, otherwise a message explaining why the server can't start. */
     fun start(id: String): String?
     fun stop(id: String)
+
+    /**
+     * Restarts a running server (a stopped one is started). @return null on success, otherwise a message explaining
+     * why it can't be restarted right now.
+     */
+    fun restart(id: String): String?
     fun command(id: String, command: String)
 
     fun readConfig(id: String): String

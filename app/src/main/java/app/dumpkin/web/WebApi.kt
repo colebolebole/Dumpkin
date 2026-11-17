@@ -163,6 +163,7 @@ class WebApi(
             .put("version", rt.version ?: JSONObject.NULL)
             .put("rssMb", rt.rssMb)
             .put("startedAt", rt.startedAt)
+            .put("restarting", rt.restarting)
             .put("error", rt.error ?: JSONObject.NULL)
     }
 
@@ -196,6 +197,11 @@ class WebApi(
             "stop" -> {
                 requireMethod(req, "POST")
                 backend.stop(id)
+                HttpResponse.json(200, serverJson(profile))
+            }
+            "restart" -> {
+                requireMethod(req, "POST")
+                backend.restart(id)?.let { throw ApiError(409, it) }
                 HttpResponse.json(200, serverJson(profile))
             }
             "command" -> {

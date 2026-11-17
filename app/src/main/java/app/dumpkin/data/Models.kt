@@ -123,6 +123,8 @@ data class RuntimeState(
     val rssMb: Int = 0,
     val startedAt: Long = 0L,
     val error: String? = null,
+    /** A restart was requested: the server is stopping (or waiting to launch again) and will come back by itself. */
+    val restarting: Boolean = false,
 ) {
     val isActive get() = status == Status.Starting || status == Status.Running || status == Status.Stopping
 }

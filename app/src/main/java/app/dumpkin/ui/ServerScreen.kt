@@ -37,9 +37,11 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
@@ -195,6 +197,7 @@ private fun HeroCard(profile: ServerProfile, rt: ServerRuntime, snack: (String) 
     val app = LocalContext.current.dumpkin
     val st by rt.state.collectAsState()
     val clipboard = LocalClipboardManager.current
+    var confirmRestart by remember { mutableStateOf(false) }
     val ip = remember(st.status) { ServerManager.localAddresses().firstOrNull() ?: "this-phone" }
     val address = "$ip:${profile.port}"
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -214,11 +217,12 @@ private fun HeroCard(profile: ServerProfile, rt: ServerRuntime, snack: (String) 
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatusBlob(st.status, 72.dp)
+                StatusBlob(st.displayStatus, 72.dp)
                 Column(Modifier.weight(1f)) {
-                    Text(statusLabel(st.status), style = MaterialTheme.typography.headlineMedium)
+                    Text(statusLabel(st), style = MaterialTheme.typography.headlineMedium)
                     Text(
                         when {
+                            st.restarting -> "Back in a few seconds, with your latest settings"
                             st.status == Status.Running ->
                                 "${st.online}/${st.max} players · up ${formatDuration(now - st.startedAt)}"
                             st.status == Status.Crashed -> st.error ?: "The server stopped unexpectedly"
@@ -262,34 +266,67 @@ private fun HeroCard(profile: ServerProfile, rt: ServerRuntime, snack: (String) 
                     }
                 }
             }
-            when (st.status) {
+            when (st.displayStatus) {
                 Status.Starting, Status.Stopping -> Row(
                     Modifier.fillMaxWidth().heightIn(min = 56.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) { ContainedLoadingIndicator(Modifier.size(56.dp)) }
-                else -> Button(
-                    onClick = {
-                        if (st.isActive) app.manager.stop(profile.id)
-                        else app.manager.start(profile.id)?.let(snack)
-                    },
-                    shapes = ButtonDefaults.shapes(),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = ButtonDefaults.MediumContainerHeight),
-                    colors = if (st.isActive) ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError,
-                    ) else ButtonDefaults.buttonColors(),
-                ) {
-                    Icon(
-                        if (st.isActive) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                        null,
-                        Modifier.size(ButtonDefaults.IconSize),
-                    )
-                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text(if (st.isActive) "Stop server" else "Start server")
+                else -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (st.status == Status.Running) {
+                        OutlinedButton(
+                            onClick = {
+                                // Restarting disconnects everyone, so check first if anyone is playing.
+                                if (st.online > 0) confirmRestart = true
+                                else app.manager.restart(profile.id)?.let(snack)
+                            },
+                            shapes = ButtonDefaults.shapes(),
+                            modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)),
+                        ) {
+                            Icon(Icons.Rounded.Refresh, null, Modifier.size(ButtonDefaults.IconSize))
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text("Restart")
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            if (st.isActive) app.manager.stop(profile.id)
+                            else app.manager.start(profile.id)?.let(snack)
+                        },
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
+                        colors = if (st.isActive) ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        ) else ButtonDefaults.buttonColors(),
+                    ) {
+                        Icon(
+                            if (st.isActive) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                            null,
+                            Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text(if (st.isActive) "Stop" else "Start server", maxLines = 1)
+                    }
                 }
             }
         }
+    }
+
+    if (confirmRestart) {
+        ConfirmDialog(
+            title = "Restart ${profile.name}?",
+            body = (if (st.online == 1) "1 player is" else "${st.online} players are") +
+                " online and will be disconnected. The server comes back in a few seconds.",
+            confirm = "Restart",
+            onDismiss = { confirmRestart = false },
+            onConfirm = {
+                confirmRestart = false
+                app.manager.restart(profile.id)?.let(snack)
+            },
+        )
     }
 }
 

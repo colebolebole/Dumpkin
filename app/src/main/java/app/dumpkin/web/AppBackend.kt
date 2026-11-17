@@ -35,6 +35,7 @@ class AppBackend(
 
     override fun start(id: String): String? = manager.start(id)
     override fun stop(id: String) = manager.stop(id)
+    override fun restart(id: String): String? = manager.restart(id)
     override fun command(id: String, command: String) = manager.command(id, command)
 
     override fun readConfig(id: String): String = manager.readRawConfig(id)

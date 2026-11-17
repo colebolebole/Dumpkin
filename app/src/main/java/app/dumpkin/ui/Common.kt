@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
+import app.dumpkin.data.RuntimeState
 import app.dumpkin.data.Status
 
 fun statusLabel(s: Status) = when (s) {
@@ -34,6 +35,11 @@ fun statusLabel(s: Status) = when (s) {
     Status.Stopping -> "Stopping…"
     Status.Crashed -> "Crashed"
 }
+
+/** What to show for a server: a restart in progress reads as one "starting" state, not stopping, offline, starting. */
+val RuntimeState.displayStatus: Status get() = if (restarting) Status.Starting else status
+
+fun statusLabel(st: RuntimeState) = if (st.restarting) "Restarting…" else statusLabel(st.status)
 
 fun formatDuration(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)

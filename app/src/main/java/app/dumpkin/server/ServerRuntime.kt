@@ -137,16 +137,19 @@ class ServerRuntime(
 
         appendLog("■ Process exited with code $code")
         val crashed = !stopRequested && (code != 0 || !everRan)
+        val willRestart = restartAfterExit
         setState {
             RuntimeState(
                 status = if (crashed) Status.Crashed else Status.Stopped,
                 error = if (crashed) "Exited with code $code" else null,
+                // Keeps the UI on "Restarting…" through the short gap before the new process launches.
+                restarting = willRestart,
             )
         }
 
         val id = profile.id
         when {
-            restartAfterExit -> {
+            willRestart -> {
                 restartAfterExit = false
                 appendLog("↻ Restarting…")
                 scope.launch { delay(2000); onRestart(id) }
@@ -188,7 +191,7 @@ class ServerRuntime(
                             appendLog("⚠ Memory use ($rss MB) is above the $limit MB limit.")
                         MemoryAction.Restart -> {
                             appendLog("⚠ Memory use ($rss MB) is above the $limit MB limit, restarting to free it.")
-                            restartAfterExit = true
+                            requestRestart()
                             stop()
                         }
                     }
@@ -250,6 +253,26 @@ class ServerRuntime(
             }
         }
     }
+
+    /**
+     * Stops the server, then starts it again once the process has exited, with the settings as they are by then.
+     * @return false when there is no live process to restart (it has not finished launching, or is not running).
+     */
+    fun restart(): Boolean {
+        if (!state.value.isActive || process == null) return false
+        appendLog("↻ Restart requested")
+        requestRestart()
+        stop() // does nothing if it is already stopping; the restart still happens after it exits
+        return true
+    }
+
+    private fun requestRestart() {
+        restartAfterExit = true
+        setState { it.copy(restarting = true) }
+    }
+
+    /** Called when the relaunch could not happen, so the UI stops saying "Restarting…". */
+    fun clearRestarting() = setState { it.copy(restarting = false) }
 
     fun stop() {
         val p = process ?: return

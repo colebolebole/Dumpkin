@@ -191,6 +191,41 @@ class WebApiTest {
         assertEquals(1, req("GET", "/api/servers", cookie = cookie).array.length())
     }
 
+    @Test fun a_running_server_can_be_restarted() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        assertEquals(false, req("GET", "/api/servers/$id", cookie = cookie).json.getBoolean("restarting"))
+        req("POST", "/api/servers/$id/start", cookie = cookie)
+
+        val r = req("POST", "/api/servers/$id/restart", cookie = cookie)
+        assertEquals(r.body, 200, r.status)
+        assertEquals("running", r.json.getString("status")) // the fake restarts instantly, so it is back up
+        assertEquals(false, r.json.getBoolean("restarting"))
+        val log = req("GET", "/api/servers/$id/logs", cookie = cookie).json.getJSONArray("lines").toString()
+        assertTrue(log, log.contains("Restart requested") && log.contains("Stopping") && log.contains("Restarting"))
+    }
+
+    @Test fun restarting_a_stopped_server_just_starts_it() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        val r = req("POST", "/api/servers/$id/restart", cookie = cookie)
+        assertEquals(r.body, 200, r.status)
+        assertEquals("running", r.json.getString("status"))
+    }
+
+    @Test fun restart_is_refused_when_it_cannot_happen() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        backend.startFailure = "No Pumpkin engine installed yet."
+        val r = req("POST", "/api/servers/$id/restart", cookie = cookie)
+        assertEquals(409, r.status)
+        assertTrue(r.json.getString("error").contains("engine", ignoreCase = true))
+        assertEquals(404, req("POST", "/api/servers/nope/restart", cookie = cookie).status)
+        assertEquals(405, req("GET", "/api/servers/$id/restart", cookie = cookie).status)
+        assertEquals(401, req("POST", "/api/servers/$id/restart").status)
+        assertEquals(403, req("POST", "/api/servers/$id/restart", cookie = cookie, csrf = false).status)
+    }
+
     @Test fun several_bedrock_servers_can_coexist_on_different_ports() {
         val cookie = login()
         val a = createServer(cookie, "A", ""","bedrock":true""")
