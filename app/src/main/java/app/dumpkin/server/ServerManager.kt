@@ -128,8 +128,14 @@ class ServerManager(private val app: Application, private val engines: EngineMan
     }
 
     companion object {
+        /** Tests replace this so screenshots and assertions don't depend on the machine's real network. */
+        @Volatile
+        var addressSource: () -> List<String> = ::readLocalAddresses
+
         /** IPv4 addresses other devices on the same network can use to reach this phone. */
-        fun localAddresses(): List<String> = runCatching {
+        fun localAddresses(): List<String> = addressSource()
+
+        private fun readLocalAddresses(): List<String> = runCatching {
             NetworkInterface.getNetworkInterfaces().toList()
                 .filter { it.isUp && !it.isLoopback }
                 .flatMap { it.inetAddresses.toList() }

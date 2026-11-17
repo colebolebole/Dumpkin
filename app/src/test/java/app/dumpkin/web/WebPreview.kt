@@ -25,12 +25,17 @@ class WebPreview {
                 "23:59:43 INFO Loaded 26 int and 4 float embedded context provider(s)",
                 "23:59:43 INFO Started server; took 26ms",
                 "23:59:43 INFO Server is now running. Connect using port: Java Edition: 0.0.0.0:25565",
-                "23:59:51 INFO colebolebole joined the game",
+                "23:59:51 INFO Alex joined the game",
                 "00:01:12 WARN Chunk generation is falling behind",
                 "00:02:30 INFO Steve joined the game",
+                "00:02:41 INFO <Steve> anyone up for a nether run?",
+                "00:02:58 INFO <Alex> yes! grabbing my pickaxe",
             ),
         )
-        backend.seed(ServerProfile(id = "cre", name = "Creative Build", port = 25566, gameMode = GameMode.Creative), RuntimeState())
+        backend.seed(
+            ServerProfile(id = "cre", name = "Creative Build", port = 25566, gameMode = GameMode.Creative, bedrock = true, bedrockPort = 19132),
+            RuntimeState(Status.Running, online = 0, max = 20, version = "26.3", rssMb = 388, startedAt = now - 2_280_000),
+        )
         backend.seed(
             ServerProfile(id = "crash", name = "Hardcore Test", port = 25567, memoryLimitMb = 1024),
             RuntimeState(Status.Crashed, error = "Exited with code 101"),

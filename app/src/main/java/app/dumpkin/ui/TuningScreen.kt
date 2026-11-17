@@ -63,6 +63,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -83,6 +84,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+/** How the tab reads the phone. Tests (and README screenshots) swap in a fixed snapshot. */
+val LocalDeviceSnapshotReader = staticCompositionLocalOf<(Context) -> DeviceSnapshot> { ::readDeviceSnapshot }
+
 /** The "Device tuning" tab: what this phone can do, and the settings that decide how well it hosts. */
 @Composable
 fun TuningScreen() {
@@ -90,6 +94,7 @@ fun TuningScreen() {
     val app = ctx.dumpkin
     val keepOn by app.keepScreenOn.collectAsState()
     var snapshot by remember { mutableStateOf<DeviceSnapshot?>(null) }
+    val reader = LocalDeviceSnapshotReader.current
 
     // Refresh while the app is on screen: memory, battery and heat change, and permissions flip when the user
     // comes back from a system settings page.
@@ -97,7 +102,7 @@ fun TuningScreen() {
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {
-                snapshot = withContext(Dispatchers.IO) { runCatching { readDeviceSnapshot(ctx) }.getOrNull() } ?: snapshot
+                snapshot = withContext(Dispatchers.IO) { runCatching { reader(ctx) }.getOrNull() } ?: snapshot
                 delay(2_000)
             }
         }

@@ -9,6 +9,27 @@
   A Material 3 Expressive app, currently in <strong>alpha</strong>. Formerly called AnCraft.
 </p>
 
+<p align="center">
+  <a href="https://github.com/colebolebole/Dumpkin/releases"><img alt="Version 0.5.0-alpha" src="https://img.shields.io/badge/version-0.5.0--alpha-F58220"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2EA44F"></a>
+  <img alt="Android 8.0 and newer" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
+  <img alt="arm64 only" src="https://img.shields.io/badge/CPU-arm64-0091BD?logo=arm&logoColor=white">
+  <img alt="Status: alpha" src="https://img.shields.io/badge/status-alpha-orange">
+  <br>
+  <img alt="Material 3 Expressive" src="https://img.shields.io/badge/Material%203-Expressive-6750A4?logo=materialdesign&logoColor=white">
+  <img alt="Jetpack Compose" src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white">
+  <img alt="Kotlin 2.2" src="https://img.shields.io/badge/Kotlin-2.2-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Hosts Pumpkin, a Minecraft server written in Rust" src="https://img.shields.io/badge/hosts-Pumpkin-F58220?logo=rust&logoColor=white">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/servers.png" alt="The Servers tab with two servers online" width="230">
+  &nbsp;
+  <img src="docs/screenshots/console.png" alt="A running server with its live console" width="230">
+  &nbsp;
+  <img src="docs/screenshots/tuning.png" alt="The Device tuning tab" width="230">
+</p>
+
 ---
 
 ## Features
@@ -41,6 +62,39 @@
 > debug key; Dumpkin releases use a proper release key.
 
 Dumpkin releases share one package name and release key, so a newer APK (for example 0.5.0) installs over any earlier Dumpkin release (0.3.0 or later) and keeps your servers.
+
+## More screenshots
+
+These are the real screens rendered with sample data (no real servers or players); see [Screenshots](#screenshots)
+under Build for how they're made.
+
+**Android app**
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/settings.png" alt="A server's settings" width="200"><br><sub>Server settings</sub></td>
+    <td align="center"><img src="docs/screenshots/bedrock.png" alt="Network settings with a Bedrock port" width="200"><br><sub>Bedrock port per server</sub></td>
+    <td align="center"><img src="docs/screenshots/engine.png" alt="The Engine tab" width="200"><br><sub>Engine builds</sub></td>
+    <td align="center"><img src="docs/screenshots/tuning-checks.png" alt="Device tuning checks" width="200"><br><sub>Tuning checks</sub></td>
+  </tr>
+</table>
+
+**Web dashboard**, which is the same app in a browser, on a PC or another phone:
+
+<p align="center">
+  <img src="docs/screenshots/web-home.png" alt="The dashboard's server list" width="800">
+</p>
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-console.png" alt="A server's live console in the dashboard" width="400"><br><sub>Live console</sub></td>
+    <td align="center"><img src="docs/screenshots/web-bedrock.png" alt="Network settings in the dashboard, with a Bedrock port" width="400"><br><sub>Every setting, including the Bedrock port</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-login.png" alt="The dashboard sign-in page" width="400"><br><sub>Password sign-in</sub></td>
+    <td align="center"><img src="docs/screenshots/web-mobile.png" alt="The dashboard on a phone" width="200"><br><sub>Laid out for phones too</sub></td>
+  </tr>
+</table>
 
 ## Web dashboard
 
@@ -179,6 +233,23 @@ DUMPKIN_PREVIEW=1 ./gradlew testDebugUnitTest --tests '*WebPreview*' -i
 ```
 
 The dashboard's HTML, CSS and JS live in `app/src/main/assets/web/` and are plain files with no build step.
+
+### Screenshots
+
+The images in `docs/screenshots` are generated, not hand-edited, and show sample data only:
+
+- **Android screens** are the real Compose UI rendered under Robolectric, with a made-up phone, servers and console log.
+  Material You colours are switched off so you get Dumpkin's own palette.
+
+  ```bash
+  DUMPKIN_SCREENSHOTS=1 ./gradlew testDebugUnitTest --tests '*Screenshots*' --rerun
+  ```
+
+- **Web dashboard** shots are taken with headless Chrome against the preview above (Windows, needs Chrome):
+
+  ```bash
+  powershell -ExecutionPolicy Bypass -File tools/capture-web-screenshots.ps1
+  ```
 
 ### Release signing
 
