@@ -16,7 +16,8 @@
 - **One-tap engine.** Downloads the official `pumpkin-aarch64-android` build (Stable, Canary or Nightly) from Pumpkin's GitHub releases.
 - **Multiple servers.** Each has its own folder, port, world and `pumpkin.toml`.
 - **Runs in the background.** A foreground service with a wake lock and low-latency Wi-Fi lock keeps servers up, with a "Stop all" button in the notification.
-- **Live console.** Send commands and watch players, uptime and RAM use. The status card shrinks while the keyboard is open so the console never gets covered.
+- **Live console.** Send commands and watch players, uptime and RAM use. Tap the command box and the console takes over the whole screen; close the keyboard and everything comes back.
+- **Roomy settings.** The status card rolls up as you scroll down the settings and returns as soon as you scroll up.
 - **Tuned for phones.** Memory limit, CPU threads, crash auto-restart, and join-speed settings (see below).
 - **Settings that edit `pumpkin.toml` in place**, plus a raw editor for everything else.
 - **Shows the address** players should connect to on your network.

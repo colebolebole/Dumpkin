@@ -1,7 +1,13 @@
 package app.ancraft.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.isImeVisible
@@ -112,37 +118,61 @@ fun ServerScreen(id: String, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val show: (String) -> Unit = { msg -> scope.launch { snackbar.showSnackbar(msg) } }
 
+    // Typing a command: the console takes over the whole screen. Opening the keyboard hides everything else and
+    // closing it brings it all back. Typing in a settings field only hides the status card.
+    val imeVisible = WindowInsets.isImeVisible
+    val fullConsole = imeVisible && tab == 0
+
+    // Settings tab: the status card rolls up as you scroll down and returns as soon as you scroll up.
+    val collapse = remember { HeaderCollapse() }
+    collapse.enabled = tab == 1 && !imeVisible
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = { Text(profile.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
-                },
-            )
+            AnimatedVisibility(
+                visible = !fullConsole,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                TopAppBar(
+                    title = { Text(profile.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+                    },
+                )
+            }
         },
     ) { pad ->
         Column(
-            Modifier.fillMaxSize().padding(pad).imePadding().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier
+                .fillMaxSize()
+                .padding(pad)
+                // With the top bar hidden nothing else pads for the status bar.
+                .then(if (fullConsole) Modifier.statusBarsPadding() else Modifier)
+                .imePadding()
+                .padding(horizontal = 16.dp)
+                .nestedScroll(collapse.connection),
         ) {
-            // The full status card takes ~45% of the screen. With the keyboard open that left the console
-            // with no height at all, so collapse it to a one-line status while typing.
-            val imeVisible = WindowInsets.isImeVisible
-            AnimatedVisibility(visible = !imeVisible) { HeroCard(profile, rt, show) }
-            AnimatedVisibility(visible = imeVisible) { CompactStatus(profile, rt, show) }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupGap), modifier = Modifier.fillMaxWidth()) {
-                listOf("Console", "Settings").forEachIndexed { i, label ->
-                    ToggleButton(
-                        checked = tab == i,
-                        onCheckedChange = { tab = i },
-                        modifier = Modifier.weight(1f),
-                        shapes = if (i == 0) ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        else ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                    ) { Text(label) }
+            // Spacing lives inside each item (not spacedBy) so hidden items leave no stray gaps.
+            AnimatedVisibility(visible = !imeVisible) {
+                Box(Modifier.collapsing(collapse).padding(bottom = 12.dp)) { HeroCard(profile, rt, show) }
+            }
+            AnimatedVisibility(visible = !fullConsole) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupGap),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                ) {
+                    listOf("Console", "Settings").forEachIndexed { i, label ->
+                        ToggleButton(
+                            checked = tab == i,
+                            onCheckedChange = { tab = i },
+                            modifier = Modifier.weight(1f),
+                            shapes = if (i == 0) ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            else ButtonGroupDefaults.connectedTrailingButtonShapes(),
+                        ) { Text(label) }
+                    }
                 }
             }
 
@@ -155,43 +185,6 @@ fun ServerScreen(id: String, onBack: () -> Unit) {
 }
 
 private val ButtonGroupGap = 2.dp
-
-@Composable
-private fun CompactStatus(profile: ServerProfile, rt: ServerRuntime, snack: (String) -> Unit) {
-    val app = LocalContext.current.ancraft
-    val st by rt.state.collectAsState()
-    val clipboard = LocalClipboardManager.current
-    val ip = remember(st.status) { ServerManager.localAddresses().firstOrNull() ?: "this-phone" }
-    val address = "$ip:${profile.port}"
-    Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            StatusBlob(st.status, 40.dp)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    statusLabel(st.status) + if (st.status == Status.Running) " · ${st.online}/${st.max}" else "",
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    address,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.clickable { clipboard.setText(AnnotatedString(address)); snack("Copied $address") },
-                )
-            }
-            if (st.status != Status.Starting && st.status != Status.Stopping) {
-                IconButton(onClick = {
-                    if (st.isActive) app.manager.stop(profile.id) else app.manager.start(profile.id)?.let(snack)
-                }) {
-                    Icon(if (st.isActive) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, if (st.isActive) "Stop" else "Start")
-                }
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
