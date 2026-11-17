@@ -11,6 +11,23 @@ enum class Difficulty(val label: String) {
     Peaceful("Peaceful"), Easy("Easy"), Normal("Normal"), Hard("Hard")
 }
 
+/**
+ * Java packet compression. Chunk packets are big, so compressing them is the main CPU cost of a join on a phone.
+ * Over a home network bandwidth is plentiful, so cheaper (or no) compression joins faster.
+ */
+enum class Compression(val label: String, val hint: String) {
+    Off("Off", "Fastest on Wi-Fi/LAN, uses more bandwidth"),
+    Fast("Fast", "Level 1: light CPU use, good for most"),
+    Balanced("Balanced", "Pumpkin's default (level 4)"),
+}
+
+/** Quick picks for view/simulation distance: fewer chunks to send means a faster join. */
+enum class DistancePreset(val label: String, val view: Int, val simulation: Int) {
+    Fast("Fast join", 6, 4),
+    Balanced("Balanced", 8, 6),
+    Detailed("Detailed", 12, 8),
+}
+
 enum class MemoryAction(val label: String) {
     Warn("Warn only"), Restart("Restart server")
 }
@@ -22,8 +39,8 @@ data class ServerProfile(
     val port: Int = 25565,
     val motd: String = "A Pumpkin server on Android",
     val maxPlayers: Int = 20,
-    val viewDistance: Int = 8,
-    val simulationDistance: Int = 6,
+    val viewDistance: Int = DistancePreset.Fast.view,
+    val simulationDistance: Int = DistancePreset.Fast.simulation,
     val gameMode: GameMode = GameMode.Survival,
     val difficulty: Difficulty = Difficulty.Normal,
     val onlineMode: Boolean = true,
@@ -38,6 +55,9 @@ data class ServerProfile(
     val autoRestart: Boolean = false,
     /** Skip the server icon in the server-list response: smaller, faster pings over Wi-Fi. */
     val lightPing: Boolean = true,
+    val compression: Compression = Compression.Fast,
+    /** Fetch/validate skins and capes on join. Turning it off trims join work but players may show default skins. */
+    val fetchSkins: Boolean = true,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -57,6 +77,8 @@ data class ServerProfile(
         put("cpuThreads", cpuThreads)
         put("autoRestart", autoRestart)
         put("lightPing", lightPing)
+        put("compression", compression.name)
+        put("fetchSkins", fetchSkins)
     }
 
     companion object {
@@ -78,6 +100,8 @@ data class ServerProfile(
             cpuThreads = o.optInt("cpuThreads", 0),
             autoRestart = o.optBoolean("autoRestart", false),
             lightPing = o.optBoolean("lightPing", true),
+            compression = Compression.entries.firstOrNull { it.name == o.optString("compression") } ?: Compression.Fast,
+            fetchSkins = o.optBoolean("fetchSkins", true),
         )
     }
 }

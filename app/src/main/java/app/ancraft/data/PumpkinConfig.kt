@@ -103,6 +103,15 @@ object PumpkinConfig {
             add(Toml.Edit("networking.bedrock", "enabled", p.bedrock.toString()))
             // The console is driven over a pipe, not a terminal.
             add(Toml.Edit("commands", "use_tty", "false"))
+            // Join speed: compression is the CPU-heavy part of sending chunks. All values are within Pumpkin's
+            // documented ranges (level 0-9); a bad value would make Pumpkin reset the whole config.
+            add(Toml.Edit("networking.java.compression", "enabled", (p.compression != Compression.Off).toString()))
+            when (p.compression) {
+                Compression.Fast -> add(Toml.Edit("networking.java.compression", "level", "1"))
+                Compression.Balanced -> add(Toml.Edit("networking.java.compression", "level", "4"))
+                Compression.Off -> Unit
+            }
+            add(Toml.Edit("networking.java.authentication.textures", "enabled", p.fetchSkins.toString()))
             // The favicon is a base64 PNG sent with every server-list ping; skipping it keeps pings snappy on Wi-Fi.
             add(Toml.Edit("", "use_favicon", (!p.lightPing).toString()))
             if (firstRun) {
@@ -132,6 +141,12 @@ object PumpkinConfig {
             onlineMode = s("networking.java", "online_mode")?.toBooleanStrictOrNull() ?: p.onlineMode,
             bedrock = s("networking.bedrock", "enabled")?.toBooleanStrictOrNull() ?: p.bedrock,
             lightPing = s("", "use_favicon")?.toBooleanStrictOrNull()?.not() ?: p.lightPing,
+            fetchSkins = s("networking.java.authentication.textures", "enabled")?.toBooleanStrictOrNull() ?: p.fetchSkins,
+            compression = when {
+                s("networking.java.compression", "enabled")?.toBooleanStrictOrNull() == false -> Compression.Off
+                (s("networking.java.compression", "level")?.toIntOrNull() ?: 4) <= 2 -> Compression.Fast
+                else -> Compression.Balanced
+            },
             gameMode = GameMode.entries.firstOrNull { it.label.equals(s("", "default_gamemode"), true) } ?: p.gameMode,
             difficulty = Difficulty.entries.firstOrNull { it.label.equals(s("", "default_difficulty"), true) } ?: p.difficulty,
         )

@@ -1,7 +1,10 @@
 package app.ancraft.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -80,7 +83,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.ancraft.ancraft
+import app.ancraft.data.Compression
 import app.ancraft.data.Difficulty
+import app.ancraft.data.DistancePreset
 import app.ancraft.data.GameMode
 import app.ancraft.data.MemoryAction
 import app.ancraft.data.ServerProfile
@@ -90,7 +95,7 @@ import app.ancraft.server.ServerRuntime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ServerScreen(id: String, onBack: () -> Unit) {
     val app = LocalContext.current.ancraft
@@ -123,7 +128,11 @@ fun ServerScreen(id: String, onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(pad).imePadding().padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            HeroCard(profile, rt, show)
+            // The full status card takes ~45% of the screen. With the keyboard open that left the console
+            // with no height at all, so collapse it to a one-line status while typing.
+            val imeVisible = WindowInsets.isImeVisible
+            AnimatedVisibility(visible = !imeVisible) { HeroCard(profile, rt, show) }
+            AnimatedVisibility(visible = imeVisible) { CompactStatus(profile, rt, show) }
 
             Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupGap), modifier = Modifier.fillMaxWidth()) {
                 listOf("Console", "Settings").forEachIndexed { i, label ->
@@ -146,6 +155,43 @@ fun ServerScreen(id: String, onBack: () -> Unit) {
 }
 
 private val ButtonGroupGap = 2.dp
+
+@Composable
+private fun CompactStatus(profile: ServerProfile, rt: ServerRuntime, snack: (String) -> Unit) {
+    val app = LocalContext.current.ancraft
+    val st by rt.state.collectAsState()
+    val clipboard = LocalClipboardManager.current
+    val ip = remember(st.status) { ServerManager.localAddresses().firstOrNull() ?: "this-phone" }
+    val address = "$ip:${profile.port}"
+    Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            StatusBlob(st.status, 40.dp)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    statusLabel(st.status) + if (st.status == Status.Running) " · ${st.online}/${st.max}" else "",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    address,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.clickable { clipboard.setText(AnnotatedString(address)); snack("Copied $address") },
+                )
+            }
+            if (st.status != Status.Starting && st.status != Status.Stopping) {
+                IconButton(onClick = {
+                    if (st.isActive) app.manager.stop(profile.id) else app.manager.start(profile.id)?.let(snack)
+                }) {
+                    Icon(if (st.isActive) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, if (st.isActive) "Stop" else "Start")
+                }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -264,7 +310,7 @@ private fun ConsolePane(rt: ServerRuntime, active: Boolean, modifier: Modifier =
     }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).heightIn(min = 120.dp).fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLowest,
         ) {
@@ -429,6 +475,21 @@ private fun SettingsPane(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text("Quick pick", style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DistancePreset.entries.forEach { preset ->
+                ToggleButton(
+                    checked = draft.viewDistance == preset.view && draft.simulationDistance == preset.simulation,
+                    onCheckedChange = { draft = draft.copy(viewDistance = preset.view, simulationDistance = preset.simulation) },
+                    shapes = ToggleButtonDefaults.shapes(),
+                ) { Text(preset.label) }
+            }
+        }
+        Text(
+            "Joining sends every chunk in view distance, so fewer chunks means a much faster join.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         SliderRow("View distance", draft.viewDistance, 2..24) { draft = draft.copy(viewDistance = it) }
         SliderRow("Simulation distance", draft.simulationDistance, 2..16) { draft = draft.copy(simulationDistance = it) }
 
@@ -494,11 +555,31 @@ private fun SettingsPane(
         ) { draft = draft.copy(autoRestart = it) }
 
         SectionTitle("Network")
+        Text("Packet compression", style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Compression.entries.forEach { c ->
+                ToggleButton(
+                    checked = draft.compression == c,
+                    onCheckedChange = { draft = draft.copy(compression = c) },
+                    shapes = ToggleButtonDefaults.shapes(),
+                ) { Text(c.label) }
+            }
+        }
+        Text(
+            draft.compression.hint + ". Compressing chunks is the main CPU cost when someone joins.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         SwitchRow(
             "Online mode",
-            "Verify players with Microsoft accounts. Turn off for offline or LAN-only play.",
+            "Verify players with Microsoft accounts. Each join waits on a Mojang lookup; offline mode skips it but lets anyone use any name.",
             draft.onlineMode,
         ) { draft = draft.copy(onlineMode = it) }
+        SwitchRow(
+            "Fetch skins and capes",
+            "Turn off to trim work during joins. Players may show default skins.",
+            draft.fetchSkins,
+        ) { draft = draft.copy(fetchSkins = it) }
         SwitchRow(
             "Lightweight server-list ping",
             "Leaves the server icon out of the multiplayer list response so it loads and pings faster.",

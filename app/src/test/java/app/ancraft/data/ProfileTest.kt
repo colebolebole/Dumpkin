@@ -20,5 +20,7 @@ class ProfileTest {
         assertEquals(0, p.cpuThreads)
         assertEquals(false, p.autoRestart)
         assertEquals(true, p.lightPing)
+        assertEquals(Compression.Fast, p.compression)
+        assertEquals(true, p.fetchSkins)
     }
 }
