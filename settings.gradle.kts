@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AnCraft"
+rootProject.name = "Dumpkin"
 include(":app")

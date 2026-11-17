@@ -8,38 +8,38 @@ plugins {
 }
 
 android {
-    namespace = "app.ancraft"
+    namespace = "app.dumpkin"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.ancraft"
+        applicationId = "app.dumpkin"
         minSdk = 26
         // Deliberately 28: Android 10+ blocks exec() of files in an app's data directory for apps
         // targeting API 29+. The Pumpkin engine is downloaded at runtime and executed from there
         // (same approach Termux uses), so this app is meant to be sideloaded, not published on Play.
         targetSdk = 28
-        versionCode = 2
-        versionName = "0.2.0-alpha"
+        versionCode = 3
+        versionName = "0.3.0-alpha"
     }
 
     // Release signing. The key lives outside the repo; see "Release signing" in the README.
-    // Settings come from keystore.properties (git-ignored) or ANCRAFT_* environment variables.
+    // Settings come from keystore.properties (git-ignored) or DUMPKIN_* environment variables.
     val signingProps = Properties().apply {
         rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
     }
     fun signingValue(prop: String, env: String): String? =
         signingProps.getProperty(prop)?.takeIf { it.isNotBlank() } ?: System.getenv(env)?.takeIf { it.isNotBlank() }
 
-    val releaseStore = signingValue("storeFile", "ANCRAFT_KEYSTORE_FILE")?.let { file(it) }
+    val releaseStore = signingValue("storeFile", "DUMPKIN_KEYSTORE_FILE")?.let { file(it) }
     val hasReleaseKey = releaseStore?.exists() == true
 
     signingConfigs {
         if (hasReleaseKey) {
             create("release") {
                 storeFile = releaseStore
-                storePassword = signingValue("storePassword", "ANCRAFT_KEYSTORE_PASSWORD")
-                keyAlias = signingValue("keyAlias", "ANCRAFT_KEY_ALIAS") ?: "ancraft"
-                keyPassword = signingValue("keyPassword", "ANCRAFT_KEY_PASSWORD")
+                storePassword = signingValue("storePassword", "DUMPKIN_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "DUMPKIN_KEY_ALIAS") ?: "dumpkin"
+                keyPassword = signingValue("keyPassword", "DUMPKIN_KEY_PASSWORD")
             }
         }
     }

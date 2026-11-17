@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="AnCraft logo" width="128" height="128">
+  <img src="docs/logo.svg" alt="Dumpkin logo" width="128" height="128">
 </p>
 
-<h1 align="center">AnCraft</h1>
+<h1 align="center">Dumpkin</h1>
 
 <p align="center">
-  Host <a href="https://pumpkinmc.org/">Pumpkin</a> Minecraft servers from your Android phone.<br>
-  A Material 3 Expressive app, currently in <strong>alpha</strong>.
+  Host <a href="https://pumpkinmc.org/">Pumpkin</a> Minecraft servers from your Android phone, and manage them from any browser.<br>
+  A Material 3 Expressive app, currently in <strong>alpha</strong>. Formerly called AnCraft.
 </p>
 
 ---
@@ -14,6 +14,7 @@
 ## Features
 
 - **One-tap engine.** Downloads the official `pumpkin-aarch64-android` build (Stable, Canary or Nightly) from Pumpkin's GitHub releases.
+- **Web dashboard.** Turn it on and create, start, stop and manage servers from a browser on your PC or another phone: console, every setting, the config file and engine downloads. Password protected (see [Web dashboard](#web-dashboard)).
 - **Multiple servers.** Each has its own folder, port, world and `pumpkin.toml`.
 - **Runs in the background.** A foreground service with a wake lock and low-latency Wi-Fi lock keeps servers up, with a "Stop all" button in the notification.
 - **Live console.** Send commands and watch players, uptime and RAM use. Tap the command box and the console takes over the whole screen; close the keyboard and everything comes back.
@@ -24,15 +25,58 @@
 
 ## Install
 
-1. Download `AnCraft-<version>.apk` from the [Releases](https://github.com/colebolebole/AnCraft/releases) page.
+1. Download `Dumpkin-<version>.apk` from the [Releases](https://github.com/colebolebole/Dumpkin/releases) page.
 2. Sideload it on an **arm64** phone running Android 8.0 or newer.
 3. Open the **Engine** tab and download a Pumpkin build.
 4. On the **Servers** tab, tap **New server**, then start it. Players on the same Wi-Fi join with the address shown on the server screen.
 
 > [!NOTE]
-> `0.1.0-alpha` and `0.2.0-alpha` were signed with a throwaway debug key. Builds signed with the real release key can't
-> update over them, so moving from those to a later release means uninstalling first, which removes server data.
-> Back up worlds before you do.
+> **Coming from AnCraft?** The app was renamed and its Android package changed from `app.ancraft` to `app.dumpkin`, so
+> Dumpkin installs *next to* AnCraft instead of updating it, and worlds are not migrated. Keep AnCraft until you've
+> finished with its servers, then uninstall it. The `0.1.0` and `0.2.0` AnCraft releases were signed with a throwaway
+> debug key; Dumpkin releases use a proper release key.
+
+## Web dashboard
+
+Open the **Dashboard** tab in the app and turn the switch on. Dumpkin starts a small web server on your phone (port
+`8080` by default). It shows its address, for example `http://192.168.0.83:8080`; open that in a browser on any device on
+the same Wi-Fi, sign in with the password from the same tab, and you can:
+
+- create, start, stop and delete servers, with a live status for each
+- watch the console and send commands
+- change every setting from the table below, and edit `pumpkin.toml` directly
+- download, update and remove engine builds
+
+It works fully offline (nothing is loaded from the internet), follows your light or dark theme, and is laid out for
+phones as well as desktops.
+
+**Security.** The dashboard is plain HTTP meant for your home network, protected by a password:
+
+- A random password is generated for you (`XXXX-XXXX-XXXX`). Change it, or make a new one, from the Dashboard tab; either signs every browser out.
+- After 5 wrong passwords an address is locked out for a minute, doubling each time up to 15 minutes.
+- Sessions use random 256-bit tokens in `HttpOnly`, `SameSite=Strict` cookies and last a week, or until the app restarts.
+- State-changing requests must carry a custom header and a matching `Origin`, and the `Host` header must be an address or local name. These block cross-site requests and DNS rebinding.
+- **Don't forward the port to the internet.** Anyone on your Wi-Fi who learns the password can start, stop and delete your servers.
+- While the dashboard is on, Dumpkin keeps running in the background (a notification shows it), which uses some battery.
+
+<details>
+<summary>JSON API</summary>
+
+Everything the page does goes through a JSON API, so you can script it. Sign in with `POST /api/login`
+(`{"password": "..."}`), keep the `dk_session` cookie, and send `X-Requested-With: Dumpkin` on every non-GET request.
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /api/state` | Phone info, engine builds and every server with its status |
+| `POST /api/servers` | Create a server (`name` plus any setting) |
+| `GET`, `PATCH`, `DELETE /api/servers/{id}` | Read, change or delete a server (delete only while stopped) |
+| `POST /api/servers/{id}/start`, `/stop` | Start or stop it |
+| `POST /api/servers/{id}/command` | Send a console command (`{"command": "list"}`) |
+| `GET /api/servers/{id}/logs?after=N` | Console lines after line `N`; `reset` is true if you must start over |
+| `GET`, `PUT /api/servers/{id}/config`, `POST .../config/reset` | Read, write or reset `pumpkin.toml` |
+| `GET /api/engine`, `POST /api/engine/refresh`, `/download`, `DELETE /api/engine/{id}` | Manage engine builds |
+
+</details>
 
 ## Server settings
 
@@ -67,17 +111,17 @@ limit, which applies as soon as you save.
 
 ## How it works
 
-- **Memory limit.** Pumpkin is native Rust code with no JVM-style `-Xmx` heap, so AnCraft reads the server's resident
+- **Memory limit.** Pumpkin is native Rust code with no JVM-style `-Xmx` heap, so Dumpkin reads the server's resident
   memory (`VmRSS` in `/proc/<pid>/status`) every 2 seconds. If it stays over the limit for two samples in a row, the chosen
   action runs. It is a soft limit, not a hard cap, and needs the process id, which some devices may not expose.
 - **CPU threads.** Sets `TOKIO_WORKER_THREADS` and `RAYON_NUM_THREADS` for the server process. Whether Pumpkin honours
   them is unconfirmed.
-- **Readiness and player count.** AnCraft uses the standard Minecraft status ping against the local port: every 250 ms
+- **Readiness and player count.** Dumpkin uses the standard Minecraft status ping against the local port: every 250 ms
   while starting, so "Online" appears as soon as the port opens, then every 10 seconds.
 - **Console.** Output is published in batches instead of rebuilding the log list per line, which matters during the startup burst.
 - **Wi-Fi lock.** Uses the low-latency mode on Android 10+ (the old high-performance mode does nothing on Android 14+).
 - **Why `targetSdk = 28`.** The engine is downloaded at runtime and run from app storage, which Android 10+ forbids for
-  apps targeting API 29+. Like Termux, AnCraft targets 28 and is meant to be sideloaded rather than published on Play. If a
+  apps targeting API 29+. Like Termux, Dumpkin targets 28 and is meant to be sideloaded rather than published on Play. If a
   device still refuses a direct exec, the runtime retries through `/system/bin/linker64`.
 
 ## Build
@@ -87,8 +131,18 @@ Requires JDK 17+ and the Android SDK (platform 36), or just Android Studio. The 
 ```bash
 ./gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease      # minified; signed with the release key if configured (see below)
-./gradlew testDebugUnitTest    # config patcher, profile round-trip, Engine-screen smoke tests
+./gradlew testDebugUnitTest    # config patcher, validation, web server and API, login security, UI smoke tests
 ```
+
+The web server is tested end to end over real sockets against a fake backend, so no phone is needed. To look at the
+dashboard UI the same way, run the preview (it serves the real server and web files for 20 minutes) and open
+`http://127.0.0.1:18080`, password `preview-1234`:
+
+```bash
+DUMPKIN_PREVIEW=1 ./gradlew testDebugUnitTest --tests '*WebPreview*' -i
+```
+
+The dashboard's HTML, CSS and JS live in `app/src/main/assets/web/` and are plain files with no build step.
 
 ### Release signing
 
@@ -97,16 +151,16 @@ Release builds are signed with a private key that is **not** in this repository.
 1. Create a keystore once (keep it outside the repo):
 
    ```bash
-   keytool -genkeypair -keystore ~/.ancraft/ancraft-release.jks -storetype PKCS12 -alias ancraft \
-     -keyalg RSA -keysize 4096 -validity 10950 -dname "CN=AnCraft"
+   keytool -genkeypair -keystore ~/.dumpkin/dumpkin-release.jks -storetype PKCS12 -alias dumpkin \
+     -keyalg RSA -keysize 4096 -validity 10950 -dname "CN=Dumpkin"
    ```
 
 2. Copy `keystore.properties.example` to `keystore.properties` (git-ignored) and fill in the path and passwords, or set the
-   `ANCRAFT_KEYSTORE_FILE`, `ANCRAFT_KEYSTORE_PASSWORD`, `ANCRAFT_KEY_ALIAS` and `ANCRAFT_KEY_PASSWORD` environment variables.
+   `DUMPKIN_KEYSTORE_FILE`, `DUMPKIN_KEYSTORE_PASSWORD`, `DUMPKIN_KEY_ALIAS` and `DUMPKIN_KEY_PASSWORD` environment variables.
 3. Build with `./gradlew assembleRelease -PrequireReleaseKey`. That flag makes the build fail if the key is missing,
    instead of quietly falling back to the debug key (which is what happens without it, with a warning, so contributors
    can still build an installable APK). Never publish a fallback build.
-4. Check the result with `apksigner verify --print-certs app-release.apk`: the signer should be `CN=AnCraft`.
+4. Check the result with `apksigner verify --print-certs app-release.apk`: the signer should be `CN=Dumpkin`.
 
 > [!IMPORTANT]
 > **Back up the keystore file and its passwords** (for example in a password manager). Android only installs an update
@@ -121,11 +175,11 @@ Android Gradle Plugin 9+. Expect some API churn when you bump it.
 - Pumpkin is under heavy development and not every vanilla mechanic exists yet. **Keep backups of your worlds.**
 - If a server won't start after changing settings, use **Reset configuration** (Settings → Advanced). Key names come from
   Pumpkin's docs and may change between versions.
-- Pumpkin ignores unknown keys, but a value of the wrong type resets the whole config to defaults, so AnCraft only writes
+- Pumpkin ignores unknown keys, but a value of the wrong type resets the whole config to defaults, so Dumpkin only writes
   documented keys with values inside the documented ranges.
 
 <details>
-<summary>Keys AnCraft writes to <code>pumpkin.toml</code></summary>
+<summary>Keys Dumpkin writes to <code>pumpkin.toml</code></summary>
 
 - Top level: `default_gamemode`, `default_difficulty`, `use_favicon`
 - `[networking.java]`: `address`, `online_mode`, `max_players`, `view_distance`, `simulation_distance`, `motd`
@@ -139,5 +193,5 @@ Android Gradle Plugin 9+. Expect some API churn when you bump it.
 
 ## Credits
 
-AnCraft is an unofficial project and is not affiliated with Pumpkin, Mojang or Microsoft. Pumpkin is licensed GPL-3.0;
-AnCraft only downloads and runs its released binary. The app has no license file yet.
+Dumpkin is an unofficial project and is not affiliated with Pumpkin, Mojang or Microsoft. Pumpkin is licensed GPL-3.0;
+Dumpkin only downloads and runs its released binary. The app has no license file yet.

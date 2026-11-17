@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="256" height="256" role="img" aria-label="AnCraft pumpkin logo">
-  <title>AnCraft</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="256" height="256" role="img" aria-label="Dumpkin pumpkin logo">
+  <title>Dumpkin</title>
   <!-- Same shapes as app/src/main/res/drawable/ic_launcher_foreground.xml on the launcher background colour -->
   <rect width="108" height="108" rx="26" fill="#2A1A10"/>
   <path fill="#F57C00" d="M54,32 C36,32 26,44 26,58 C26,72 36,82 54,82 C72,82 82,72 82,58 C82,44 72,32 54,32 Z"/>
