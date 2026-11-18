@@ -39,9 +39,9 @@
 - **Multiple servers.** Each has its own folder, port, world and `pumpkin.toml`.
 - **One-tap restart.** Restart a running server from the app or the web dashboard to apply new settings. It asks first if players are online.
 - **Bedrock on every server.** Each server can have its own Bedrock port, so several Bedrock servers run side by side (see [Bedrock servers](#bedrock-servers)).
-- **Backups.** Zip a server's whole folder in one tap, restore it later, and save the zip off the phone, from the app or the web dashboard (see [Files and backups](#files-and-backups)).
-- **File browser.** Look through a server's folder, open and edit text files such as `ops.json`, make folders, rename and delete, in the app and the dashboard.
-- **App updates.** The app checks the Dumpkin releases on GitHub, downloads a newer APK, verifies it and hands it to Android's installer (see [App updates](#app-updates)).
+- **Backups** *(new in 0.6.0)*. Zip a server's whole folder in one tap, restore it later, and save the zip off the phone, from the app or the web dashboard (see [Files and backups](#files-and-backups)).
+- **File browser** *(new in 0.6.0)*. Look through a server's folder, open and edit text files such as `ops.json`, make folders, rename and delete, in the app and the dashboard.
+- **App updates** *(new in 0.6.0)*. The app checks the Dumpkin releases on GitHub, downloads a newer APK, verifies it and hands it to Android's installer (see [App updates](#app-updates)).
 - **Runs in the background.** A foreground service with a wake lock and low-latency Wi-Fi lock keeps servers up, with a "Stop all" button in the notification.
 - **Live console.** Send commands and watch players, uptime and RAM use. Tap the command box and the console takes over the whole screen; close the keyboard and everything comes back.
 - **Roomy settings.** The status card rolls up as you scroll down the settings and returns as soon as you scroll up.
@@ -65,7 +65,7 @@
 > finished with its servers, then uninstall it. The `0.1.0` and `0.2.0` AnCraft releases were signed with a throwaway
 > debug key; Dumpkin releases use a proper release key.
 
-Dumpkin releases share one package name and release key, so a newer APK (for example 0.5.0) installs over any earlier Dumpkin release (0.3.0 or later) and keeps your servers. From the release that adds [App updates](#app-updates) onward, the app can fetch the next one itself.
+Dumpkin releases share one package name and release key, so a newer APK (for example 0.6.0) installs over any earlier Dumpkin release (0.3.0 or later) and keeps your servers. **0.6.0 is the first release that can update itself** (see [App updates](#app-updates)), so getting to it from an older version is a manual install; after that the app can fetch the next one.
 
 ## More screenshots
 
@@ -195,7 +195,7 @@ server's Java or Bedrock port. Servers that already used Bedrock keep 19132. The
 
 ## Files and backups
 
-Every server has **Files** and **Backups** tabs next to Console and Settings, in the app and in the web dashboard.
+*Available from 0.6.0.* Every server has **Files** and **Backups** tabs next to Console and Settings, in the app and in the web dashboard.
 
 **Files**
 - Browse the server's folder, open text files (up to 256 KB, UTF-8) such as `ops.json` or `pumpkin.toml`, edit and save them, make
@@ -220,7 +220,7 @@ Every server has **Files** and **Backups** tabs next to Console and Settings, in
 
 ## App updates
 
-The **Engine** tab has an **App updates** card. Dumpkin looks at the releases of this repository on GitHub (when the app
+*Available from 0.6.0.* The **Engine** tab has an **App updates** card. Dumpkin looks at the releases of this repository on GitHub (when the app
 opens, at most every 12 hours, or when you tap **Check for updates**) and shows a banner on the Servers tab when a newer
 version is out. **Download** fetches the APK and checks it before offering **Install**:
 
