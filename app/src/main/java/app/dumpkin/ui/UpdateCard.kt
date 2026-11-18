@@ -160,7 +160,7 @@ fun UpdateCard(modifier: Modifier = Modifier) {
                 Column(Modifier.weight(1f)) {
                     Text("GitHub access token", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (hasToken) "Set. Needed only while the repository is private." else "Not set. Needed only while the repository is private.",
+                        if (hasToken) "Set. Optional: the repository is public." else "Not set. Optional: the repository is public, so updates work without one.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -216,9 +216,10 @@ private fun TokenDialog(hasToken: Boolean, onDismiss: () -> Unit, onSave: (Strin
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "While the Dumpkin repository is private, GitHub only shows its releases to someone signed in. " +
-                        "Create a fine-grained personal access token with read-only access to \"Contents\" for the repository, and paste it here. " +
-                        "It is stored only on this phone and sent only to api.github.com. Leave this empty once the repository is public.",
+                    "You don't need this: the Dumpkin repository is public, so updates work without a token. " +
+                        "Add one only to get past GitHub's limit on anonymous requests, or if the repository is ever made private again. " +
+                        "Use a fine-grained personal access token with read-only access to \"Contents\" for the repository. " +
+                        "It is stored only on this phone and sent only to api.github.com.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedTextField(

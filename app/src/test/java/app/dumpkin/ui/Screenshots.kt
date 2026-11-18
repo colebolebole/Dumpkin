@@ -159,11 +159,11 @@ class Screenshots {
     /** Pretends GitHub has a newer release, so the update card and banner can be shown. */
     private fun offerUpdate() {
         val release = ReleaseInfo(
-            tag = "v0.6.0-alpha", version = "0.6.0-alpha", title = "Dumpkin 0.6.0 Alpha",
-            notes = "**Backups, a file browser and in-app updates.**\n\n### What's new\n- Back up a server and restore it later\n" +
-                "- Browse and edit a server's files\n- Update Dumpkin from inside the app",
-            assetName = "Dumpkin-0.6.0-alpha.apk", assetApiUrl = "https://api.github.com/x", downloadUrl = "https://github.com/x",
-            size = 1_650_000, sha256 = null, publishedAt = "2026-11-20T10:00:00Z", pageUrl = "https://github.com/x",
+            tag = "v0.7.0-alpha", version = "0.7.0-alpha", title = "Dumpkin 0.7.0 Alpha",
+            notes = "**Faster joins and a new look for the console.**\n\n### What's new\n- Chunks load quicker when players join\n" +
+                "- A tidier console with search\n- Smaller downloads",
+            assetName = "Dumpkin-0.7.0-alpha.apk", assetApiUrl = "https://api.github.com/x", downloadUrl = "https://github.com/x",
+            size = 1_650_000, sha256 = null, publishedAt = "2026-12-20T10:00:00Z", pageUrl = "https://github.com/x",
         )
         getField<MutableStateFlow<UpdateState>>(app().updates, "_state").value = UpdateState.Available(release)
     }

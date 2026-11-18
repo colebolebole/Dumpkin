@@ -231,11 +231,11 @@ Then Android's own installer takes over and asks for your confirmation: nothing 
 Android asks you to allow Dumpkin to install apps. Installing restarts the app, which stops running servers, so the card warns
 you if any are running. Updates only come from GitHub over HTTPS (a redirect anywhere else is refused).
 
-> [!NOTE]
-> **While the repository is private**, GitHub only shows its releases to someone signed in, so the check fails with "HTTP 404"
-> until you add a **GitHub access token** (the card has a button). Create a fine-grained personal access token with read-only
-> access to the repository's *Contents*, and paste it in. It is stored only on the phone and sent only to `api.github.com`,
-> never to the download host. Once the repository is public no token is needed.
+The repository is public, so **no token is needed**: the check works out of the box. The card still has an optional
+**GitHub access token** field for two cases: GitHub limits anonymous requests (about 60 an hour, plenty for one check every
+12 hours, but shared Wi-Fi networks can use them up), and a token also lets the check work if the repository is ever made
+private again (the check then fails with "HTTP 404"). Use a fine-grained personal access token with read-only access to the
+repository's *Contents*. It is stored only on the phone and sent only to `api.github.com`, never to the download host.
 
 ## Engine tab
 
