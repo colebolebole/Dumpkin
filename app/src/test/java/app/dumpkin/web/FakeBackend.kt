@@ -27,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * servers take a moment to start and stop, which makes it a convincing back end for previewing the web UI.
  */
 class FakeBackend(private val instant: Boolean = true) : WebBackend {
-    override val appVersion = "0.5.1-alpha"
+    override val appVersion = "0.6.0-alpha"
     override var engineSupported = true
 
     val servers = CopyOnWriteArrayList<ServerProfile>()
