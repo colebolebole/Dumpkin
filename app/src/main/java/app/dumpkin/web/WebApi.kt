@@ -6,6 +6,8 @@ import app.dumpkin.data.ProfileRules
 import app.dumpkin.data.RuntimeState
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.engine.EngineUiState
+import app.dumpkin.files.FileError
+import app.dumpkin.files.Listing
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -180,7 +182,8 @@ class WebApi(
         val id = segs[0]
         val profile = backend.profiles().firstOrNull { it.id == id } ?: throw ApiError(404, "No such server.")
         val sub = segs.getOrNull(1)
-        if (segs.size > 3 || (segs.size == 3 && !(sub == "config" && segs[2] == "reset"))) throw ApiError(404, "Not found.")
+        val maxSegs = when (sub) { "files", "config" -> 3; "backups" -> 4; else -> 2 }
+        if (segs.size > maxSegs || (sub == "config" && segs.size == 3 && segs[2] != "reset")) throw ApiError(404, "Not found.")
 
         return when (sub) {
             null -> when (req.method) {
@@ -223,6 +226,8 @@ class WebApi(
                 )
             }
             "config" -> config(req, segs, profile)
+            "files" -> files(req, segs, profile)
+            "backups" -> backups(req, segs, profile)
             else -> throw ApiError(404, "Not found.")
         }
     }
@@ -281,6 +286,121 @@ class WebApi(
             }
             else -> throw ApiError(405, "Method not allowed.")
         }
+    }
+
+    // ---- files -----------------------------------------------------------------------------------------------------
+
+    /**
+     * Browse and edit a server's folder. Reading and downloading are always allowed; anything that changes files needs
+     * the server stopped, because a running server rewrites its own files and deleting a world under it corrupts it.
+     */
+    private fun files(req: HttpRequest, segs: List<String>, profile: ServerProfile): HttpResponse {
+        val fs = backend.files(profile.id) ?: throw ApiError(404, "No such server.")
+        val id = profile.id
+        fun requireStopped() {
+            if (backend.runtime(id)?.isActive == true) throw ApiError(409, "Stop the server before changing its files.")
+        }
+        try {
+            return when (segs.getOrNull(2)) {
+                null -> when (req.method) {
+                    "GET" -> HttpResponse.json(200, listingJson(fs.list(req.query["path"] ?: "")))
+                    "DELETE" -> { requireStopped(); fs.delete(req.query["path"] ?: ""); okJson() }
+                    else -> throw ApiError(405, "Method not allowed.")
+                }
+                "content" -> when (req.method) {
+                    "GET" -> {
+                        val t = fs.readText(req.query["path"] ?: "")
+                        HttpResponse.json(200, JSONObject().put("path", t.path).put("text", t.text).put("size", t.size))
+                    }
+                    "PUT" -> {
+                        requireStopped()
+                        val body = jsonBody(req)
+                        val text = body.optString("text", null) ?: throw ApiError(400, "Send the file as {\"path\": ..., \"text\": ...}.")
+                        fs.writeText(body.optString("path", ""), text)
+                        okJson()
+                    }
+                    else -> throw ApiError(405, "Method not allowed.")
+                }
+                "mkdir" -> { requireMethod(req, "POST"); requireStopped(); fs.mkdir(jsonBody(req).optString("path", "")); okJson() }
+                "rename" -> {
+                    requireMethod(req, "POST"); requireStopped()
+                    val body = jsonBody(req)
+                    fs.rename(body.optString("path", ""), body.optString("name", ""))
+                    okJson()
+                }
+                "download" -> {
+                    requireMethod(req, "GET")
+                    val f = fs.file(req.query["path"] ?: "")
+                    HttpResponse.download(f, f.name)
+                }
+                else -> throw ApiError(404, "Not found.")
+            }
+        } catch (e: FileError) {
+            throw ApiError(e.status, e.message ?: "Something went wrong with that file.")
+        }
+    }
+
+    private fun listingJson(l: Listing): JSONObject = JSONObject()
+        .put("path", l.path)
+        .put("truncated", l.truncated)
+        .put("entries", JSONArray().also { arr ->
+            l.entries.forEach {
+                arr.put(JSONObject().put("name", it.name).put("path", it.path).put("dir", it.isDir).put("size", it.size).put("modified", it.modified))
+            }
+        })
+
+    private fun okJson() = HttpResponse.json(200, JSONObject().put("ok", true))
+
+    // ---- backups ---------------------------------------------------------------------------------------------------
+
+    private fun backups(req: HttpRequest, segs: List<String>, profile: ServerProfile): HttpResponse {
+        val center = backend.backups
+        val id = profile.id
+        return when (segs.size) {
+            2 -> when (req.method) {
+                "GET" -> HttpResponse.json(200, backupsJson(id))
+                "POST" -> {
+                    val label = jsonBody(req).optString("label", "").take(60)
+                    center.startBackup(id, label)?.let { throw ApiError(409, it) }
+                    HttpResponse.json(202, backupsJson(id))
+                }
+                else -> throw ApiError(405, "Method not allowed.")
+            }
+            3 -> {
+                requireMethod(req, "DELETE")
+                if (center.job(id)?.isRunning == true) throw ApiError(409, "A backup or restore is running. Wait for it to finish.")
+                if (!center.delete(id, segs[2])) throw ApiError(404, "No such backup.")
+                okJson()
+            }
+            else -> when (segs[3]) {
+                "download" -> {
+                    requireMethod(req, "GET")
+                    val f = center.file(id, segs[2]) ?: throw ApiError(404, "No such backup.")
+                    HttpResponse.download(f, "${profile.name.ifBlank { "server" }}-${f.name}")
+                }
+                "restore" -> {
+                    requireMethod(req, "POST")
+                    if (center.file(id, segs[2]) == null) throw ApiError(404, "No such backup.")
+                    center.startRestore(id, segs[2])?.let { throw ApiError(409, it) }
+                    HttpResponse.json(202, backupsJson(id))
+                }
+                else -> throw ApiError(404, "Not found.")
+            }
+        }
+    }
+
+    private fun backupsJson(id: String): JSONObject {
+        val job = backend.backups.visibleJob(id)
+        return JSONObject()
+            .put("backups", JSONArray().also { arr ->
+                backend.backups.list(id).forEach {
+                    arr.put(JSONObject().put("name", it.name).put("size", it.size).put("createdAt", it.createdAt).put("label", it.label))
+                }
+            })
+            .put("job", if (job == null) JSONObject.NULL else JSONObject()
+                .put("kind", job.kind.name.lowercase()).put("name", job.backupName ?: JSONObject.NULL)
+                .put("progress", job.progress.toDouble()).put("state", job.state.name.lowercase())
+                .put("message", job.message ?: JSONObject.NULL))
     }
 
     // ---- engine ----------------------------------------------------------------------------------------------------

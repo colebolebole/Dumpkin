@@ -1,5 +1,7 @@
 package app.dumpkin.web
 
+import app.dumpkin.backup.BackupCenter
+import app.dumpkin.backup.BackupStore
 import app.dumpkin.data.RuntimeState
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.data.Status
@@ -7,9 +9,14 @@ import app.dumpkin.engine.Channel
 import app.dumpkin.engine.EngineUiState
 import app.dumpkin.engine.InstalledEngine
 import app.dumpkin.engine.RemoteEngine
+import app.dumpkin.files.ServerFiles
 import app.dumpkin.server.LogBuffer
 import app.dumpkin.server.LogSlice
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import java.io.File
+import java.nio.file.Files
 import java.util.Timer
 import java.util.TimerTask
 import java.util.concurrent.ConcurrentHashMap
@@ -40,6 +47,34 @@ class FakeBackend(private val instant: Boolean = true) : WebBackend {
     var startFailure: String? = null
     val sentCommands = CopyOnWriteArrayList<String>()
 
+    /** Real folders under a temp directory, so the file browser and backups run their real code in tests. */
+    private val dataRoot: File = Files.createTempDirectory("dk-fake-backend").toFile().also { it.deleteOnExit() }
+    fun serverDir(id: String): File = File(dataRoot, "servers/$id").apply { mkdirs() }
+
+    override fun files(id: String): ServerFiles? = if (servers.any { it.id == id }) ServerFiles(serverDir(id)) else null
+
+    override val backups = BackupCenter(
+        store = BackupStore(File(dataRoot, "backups")),
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        serverDir = { id -> if (servers.any { it.id == id }) serverDir(id) else null },
+        serverName = { id -> servers.firstOrNull { it.id == id }?.name },
+        isActive = { id -> states[id]?.isActive == true },
+    )
+
+    /** Fills a server folder with a small, believable world, for previews and tests. */
+    fun seedFiles(id: String) {
+        val dir = serverDir(id)
+        File(dir, "pumpkin.toml").writeText(readConfig(id))
+        File(dir, "ops.json").writeText("[\n  {\"name\": \"Steve\", \"level\": 4}\n]\n")
+        File(dir, "whitelist.json").writeText("[]\n")
+        File(dir, "world/region").mkdirs()
+        File(dir, "world/level.dat").writeBytes(ByteArray(1_800) { (it * 7).toByte() })
+        File(dir, "world/region/r.0.0.mca").writeBytes(ByteArray(120_000) { (it % 97).toByte() })
+        File(dir, "world/region/r.0.-1.mca").writeBytes(ByteArray(64_000) { (it % 61).toByte() })
+        File(dir, "logs").mkdirs()
+        File(dir, "logs/latest.log").writeText("00:00:01 INFO Started server\n00:00:09 INFO Steve joined the game\n")
+    }
+
     private fun buffer(id: String) = buffers.getOrPut(id) { LogBuffer(2000) }
     private fun log(id: String, vararg lines: String) = buffer(id).append(lines.toList())
     private fun later(ms: Long, block: () -> Unit) {
@@ -51,13 +86,15 @@ class FakeBackend(private val instant: Boolean = true) : WebBackend {
     override fun runtime(id: String): RuntimeState? = if (servers.any { it.id == id }) states[id] ?: RuntimeState() else null
     override fun logsSince(id: String, cursor: Long): LogSlice? = if (servers.any { it.id == id }) buffer(id).slice(cursor) else null
 
-    override fun create(profile: ServerProfile) { servers.add(profile) }
+    override fun create(profile: ServerProfile) { servers.add(profile); seedFiles(profile.id) }
     override fun update(profile: ServerProfile) {
         val i = servers.indexOfFirst { it.id == profile.id }
         if (i >= 0) servers[i] = profile
     }
     override fun delete(id: String) {
         servers.removeAll { it.id == id }; states.remove(id); buffers.remove(id); configs.remove(id)
+        File(dataRoot, "servers/$id").deleteRecursively()
+        backups.deleteAll(id)
     }
 
     override fun start(id: String): String? {
@@ -139,6 +176,7 @@ class FakeBackend(private val instant: Boolean = true) : WebBackend {
     fun seed(profile: ServerProfile, state: RuntimeState, lines: List<String> = emptyList()) {
         servers.add(profile)
         states[profile.id] = state
+        seedFiles(profile.id)
         if (lines.isNotEmpty()) log(profile.id, *lines.toTypedArray())
     }
 

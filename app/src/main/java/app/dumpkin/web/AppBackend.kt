@@ -1,7 +1,9 @@
 package app.dumpkin.web
 
 import android.app.Application
+import app.dumpkin.backup.BackupCenter
 import app.dumpkin.data.RuntimeState
+import app.dumpkin.files.ServerFiles
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.data.deviceMemory
 import app.dumpkin.engine.EngineManager
@@ -37,6 +39,9 @@ class AppBackend(
     override fun stop(id: String) = manager.stop(id)
     override fun restart(id: String): String? = manager.restart(id)
     override fun command(id: String, command: String) = manager.command(id, command)
+
+    override fun files(id: String): ServerFiles? = manager.files(id)
+    override val backups: BackupCenter get() = manager.backups
 
     override fun readConfig(id: String): String = manager.readRawConfig(id)
 

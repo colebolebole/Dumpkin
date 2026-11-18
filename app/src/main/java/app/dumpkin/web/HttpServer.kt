@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.net.InetAddress
@@ -15,7 +16,9 @@ import java.net.URLDecoder
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 class HttpRequest(
     val method: String,
@@ -39,10 +42,33 @@ class HttpResponse(
     val status: Int,
     val headers: Map<String, String> = emptyMap(),
     val body: ByteArray = ByteArray(0),
+    /** When set, the file is streamed as the body (backups can be hundreds of MB) and [body] is ignored. */
+    val file: File? = null,
 ) {
-    fun withHeader(name: String, value: String) = HttpResponse(status, headers + (name to value), body)
+    fun withHeader(name: String, value: String) = HttpResponse(status, headers + (name to value), body, file)
 
     companion object {
+        /**
+         * A file download. Always `application/octet-stream` + `attachment`, so the browser saves it instead of
+         * rendering it: a file from a server folder must never run as a page on the dashboard's origin.
+         */
+        fun download(file: File, filename: String) = HttpResponse(
+            200,
+            mapOf(
+                "Content-Type" to "application/octet-stream",
+                "Content-Disposition" to contentDisposition(filename),
+                "Cache-Control" to "no-store",
+            ),
+            file = file,
+        )
+
+        fun contentDisposition(filename: String): String {
+            val ascii = filename.map { if (it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it in "._- ") it else '_' }
+                .joinToString("").ifBlank { "download" }
+            val encoded = java.net.URLEncoder.encode(filename, "UTF-8").replace("+", "%20")
+            return "attachment; filename=\"$ascii\"; filename*=UTF-8''$encoded"
+        }
+
         fun json(status: Int, value: JSONObject) = HttpResponse(
             status, mapOf("Content-Type" to "application/json; charset=utf-8", "Cache-Control" to "no-store"),
             value.toString().toByteArray(Charsets.UTF_8),
@@ -72,6 +98,7 @@ class HttpServer(
     @Volatile private var socket: ServerSocket? = null
     private var acceptThread: Thread? = null
     private val workers = Executors.newFixedThreadPool(WORKERS, namedDaemonThreads("dumpkin-web"))
+    private val watchdogs = Executors.newSingleThreadScheduledExecutor(namedDaemonThreads("dumpkin-web-watchdog"))
 
     val boundPort: Int get() = socket?.localPort ?: -1
     val isRunning: Boolean get() = socket?.isClosed == false
@@ -90,6 +117,7 @@ class HttpServer(
         runCatching { socket?.close() }
         socket = null
         workers.shutdownNow()
+        watchdogs.shutdownNow()
     }
 
     private fun acceptLoop(s: ServerSocket) {
@@ -128,9 +156,19 @@ class HttpServer(
             } catch (_: Exception) {
                 HttpResponse.error(500, "Something went wrong on the server.")
             }
+            // Java can't time out a blocked write, so a client that stops reading a download would hold a worker
+            // forever. Close the connection if a streamed file makes no progress for a while.
+            val progress = AtomicLong(System.currentTimeMillis())
+            val watchdog = if (response.file != null) {
+                watchdogs.scheduleWithFixedDelay({
+                    if (System.currentTimeMillis() - progress.get() > STALL_MS) runCatching { c.close() }
+                }, 5, 5, TimeUnit.SECONDS)
+            } else null
             try {
-                write(out, response, headOnly = request.method == "HEAD")
+                write(out, response, headOnly = request.method == "HEAD", progress = progress)
             } catch (_: IOException) {
+            } finally {
+                watchdog?.cancel(false)
             }
         }
     }
@@ -214,7 +252,8 @@ class HttpServer(
         return HttpRequest(method, path, query, headers, body, remoteIp)
     }
 
-    private fun write(out: java.io.OutputStream, r: HttpResponse, headOnly: Boolean) {
+    private fun write(out: java.io.OutputStream, r: HttpResponse, headOnly: Boolean, progress: AtomicLong? = null) {
+        val fileLength = r.file?.length()
         val sb = StringBuilder()
         sb.append("HTTP/1.1 ").append(r.status).append(' ').append(reason(r.status)).append("\r\n")
         val all = LinkedHashMap<String, String>()
@@ -225,7 +264,7 @@ class HttpServer(
             "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; " +
                 "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
         all.putAll(r.headers)
-        all["Content-Length"] = r.body.size.toString()
+        all["Content-Length"] = (fileLength ?: r.body.size.toLong()).toString()
         all["Connection"] = "close"
         for ((k, v) in all) {
             require(!k.contains('\r') && !k.contains('\n') && !v.contains('\r') && !v.contains('\n')) { "header injection" }
@@ -233,7 +272,23 @@ class HttpServer(
         }
         sb.append("\r\n")
         out.write(sb.toString().toByteArray(Charsets.ISO_8859_1))
-        if (!headOnly) out.write(r.body)
+        if (!headOnly) {
+            if (r.file != null && fileLength != null) {
+                // Send exactly the promised number of bytes; if the file changed underneath us, closing early is
+                // better than a response whose length doesn't match its header.
+                r.file.inputStream().use { input ->
+                    val buf = ByteArray(64 * 1024)
+                    var left = fileLength
+                    while (left > 0) {
+                        val n = input.read(buf, 0, minOf(buf.size.toLong(), left).toInt())
+                        if (n < 0) throw IOException("file shrank while being sent")
+                        out.write(buf, 0, n)
+                        left -= n
+                        progress?.set(System.currentTimeMillis())
+                    }
+                }
+            } else out.write(r.body)
+        }
         out.flush()
     }
 
@@ -255,6 +310,7 @@ class HttpServer(
         const val READ_TIMEOUT_MS = 10_000
         const val MAX_HEADER_BYTES = 16 * 1024
         const val MAX_BODY_BYTES = 64 * 1024
+        const val STALL_MS = 60_000L
         private val ALLOWED_METHODS = setOf("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE")
     }
 }

@@ -191,6 +191,174 @@ class WebApiTest {
         assertEquals(1, req("GET", "/api/servers", cookie = cookie).array.length())
     }
 
+    // ---- files -------------------------------------------------------------------------------------------------
+
+    private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
+
+    @Test fun the_file_browser_lists_reads_and_refuses_to_leave_the_server_folder() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        val root = req("GET", "/api/servers/$id/files", cookie = cookie)
+        assertEquals(root.body, 200, root.status)
+        val names = (0 until root.json.getJSONArray("entries").length()).map { root.json.getJSONArray("entries").getJSONObject(it).getString("name") }
+        assertEquals(listOf("logs", "world", "ops.json", "pumpkin.toml", "whitelist.json"), names)
+
+        val world = req("GET", "/api/servers/$id/files?path=${enc("world/region")}", cookie = cookie).json
+        assertEquals("world/region", world.getString("path"))
+        assertEquals(2, world.getJSONArray("entries").length())
+
+        val text = req("GET", "/api/servers/$id/files/content?path=pumpkin.toml", cookie = cookie)
+        assertEquals(200, text.status)
+        assertTrue(text.json.getString("text").contains("max_players"))
+        assertEquals(415, req("GET", "/api/servers/$id/files/content?path=${enc("world/level.dat")}", cookie = cookie).status)
+
+        for (evil in listOf("..", "../..", "world/../../..", "..%2F..%2Fetc", "%2e%2e/%2e%2e", "world\\..\\..")) {
+            val path = "/api/servers/$id/files?path=" + (if (evil.contains('%')) evil else enc(evil))
+            assertEquals(evil, 400, req("GET", path, cookie = cookie).status)
+            assertEquals(evil, 400, req("GET", path.replace("/files?", "/files/content?"), cookie = cookie).status)
+            assertEquals(evil, 400, req("GET", path.replace("/files?", "/files/download?"), cookie = cookie).status)
+        }
+        assertEquals(404, req("GET", "/api/servers/nope/files", cookie = cookie).status)
+        assertEquals(401, req("GET", "/api/servers/$id/files").status)
+    }
+
+    @Test fun changing_files_needs_a_stopped_server_and_the_usual_security_headers() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        val dir = backend.serverDir(id)
+        req("POST", "/api/servers/$id/start", cookie = cookie)
+        val body = """{"path":"pumpkin.toml","text":"motd = \"edited\"\n"}"""
+        for ((m, p, b) in listOf(
+            Triple("PUT", "/api/servers/$id/files/content", body),
+            Triple("POST", "/api/servers/$id/files/mkdir", """{"path":"newdir"}"""),
+            Triple("POST", "/api/servers/$id/files/rename", """{"path":"ops.json","name":"x.json"}"""),
+            Triple("DELETE", "/api/servers/$id/files?path=ops.json", null),
+        )) {
+            val r = req(m, p, b, cookie)
+            assertEquals("$m $p", 409, r.status)
+            assertTrue(r.json.getString("error").contains("Stop the server"))
+        }
+        assertTrue("nothing was changed", File(dir, "ops.json").exists() && !File(dir, "newdir").exists())
+        // Reading is still fine while it runs.
+        assertEquals(200, req("GET", "/api/servers/$id/files/content?path=ops.json", cookie = cookie).status)
+
+        req("POST", "/api/servers/$id/stop", cookie = cookie)
+        assertEquals(200, req("PUT", "/api/servers/$id/files/content", body, cookie).status)
+        assertEquals("motd = \"edited\"\n", File(dir, "pumpkin.toml").readText())
+        assertEquals(200, req("POST", "/api/servers/$id/files/mkdir", """{"path":"world/backups"}""", cookie).status)
+        assertTrue(File(dir, "world/backups").isDirectory)
+        assertEquals(409, req("POST", "/api/servers/$id/files/mkdir", """{"path":"world/backups"}""", cookie).status)
+        assertEquals(200, req("POST", "/api/servers/$id/files/rename", """{"path":"ops.json","name":"admins.json"}""", cookie).status)
+        assertTrue(File(dir, "admins.json").exists())
+        assertEquals(400, req("POST", "/api/servers/$id/files/rename", """{"path":"admins.json","name":"../escape.json"}""", cookie).status)
+        assertEquals(200, req("DELETE", "/api/servers/$id/files?path=world", cookie = cookie).status)
+        assertFalse(File(dir, "world").exists())
+        assertEquals(400, req("DELETE", "/api/servers/$id/files?path=", cookie = cookie).status)
+        assertTrue("the server folder survives", dir.isDirectory)
+
+        // Same-site protection applies to every change.
+        assertEquals(403, req("PUT", "/api/servers/$id/files/content", body, cookie, csrf = false).status)
+        assertEquals(403, req("DELETE", "/api/servers/$id/files?path=admins.json", cookie = cookie, csrf = false).status)
+        assertEquals(403, req("POST", "/api/servers/$id/files/mkdir", """{"path":"x"}""", cookie, headers = mapOf("Origin" to "http://evil.example")).status)
+        assertEquals(401, req("PUT", "/api/servers/$id/files/content", body).status)
+    }
+
+    @Test fun downloads_are_attachments_that_a_browser_cannot_run() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        File(backend.serverDir(id), "page.html").writeText("<script>alert(1)</script>")
+        val r = req("GET", "/api/servers/$id/files/download?path=page.html", cookie = cookie)
+        assertEquals(200, r.status)
+        assertEquals("application/octet-stream", r.header("content-type"))
+        assertTrue(r.header("content-disposition")!!.startsWith("attachment;"))
+        assertEquals("nosniff", r.header("x-content-type-options"))
+        assertEquals("<script>alert(1)</script>", r.body)
+        assertEquals(404, req("GET", "/api/servers/$id/files/download?path=world", cookie = cookie).status)
+
+        val cd = HttpResponse.contentDisposition("we\"ird\r\nname; x.zip")
+        assertFalse(cd.contains('\r') || cd.contains('\n'))
+        assertEquals("only the quotes that frame the name", 2, cd.substringBefore("; filename*").count { it == '"' })
+    }
+
+    // ---- backups -----------------------------------------------------------------------------------------------
+
+    private fun awaitJob(cookie: String, id: String): JSONObject {
+        val end = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < end) {
+            val job = req("GET", "/api/servers/$id/backups", cookie = cookie).json.get("job")
+            if (job is JSONObject && job.getString("state") != "running") return job
+            Thread.sleep(20)
+        }
+        error("backup job did not finish")
+    }
+
+    @Test fun backups_can_be_made_downloaded_restored_and_deleted() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        val dir = backend.serverDir(id)
+
+        assertEquals(0, req("GET", "/api/servers/$id/backups", cookie = cookie).json.getJSONArray("backups").length())
+        assertEquals(202, req("POST", "/api/servers/$id/backups", """{"label":"Before the big update"}""", cookie).status)
+        val job = awaitJob(cookie, id)
+        assertEquals(job.toString(), "done", job.getString("state"))
+
+        val list = req("GET", "/api/servers/$id/backups", cookie = cookie).json.getJSONArray("backups")
+        assertEquals(1, list.length())
+        val name = list.getJSONObject(0).getString("name")
+        assertEquals("before-the-big-update", list.getJSONObject(0).getString("label"))
+
+        val dl = req("GET", "/api/servers/$id/backups/${enc(name)}/download", cookie = cookie)
+        assertEquals(200, dl.status)
+        assertEquals("application/octet-stream", dl.header("content-type"))
+        assertTrue(dl.header("content-disposition")!!.contains("attachment"))
+        assertEquals(list.getJSONObject(0).getLong("size").toString(), dl.header("content-length"))
+        assertTrue("a zip starts with PK", dl.body.startsWith("PK"))
+
+        // Break the server, then restore.
+        req("POST", "/api/servers/$id/start", cookie = cookie)
+        assertEquals("restoring a running server is refused", 409, req("POST", "/api/servers/$id/backups/${enc(name)}/restore", cookie = cookie).status)
+        req("POST", "/api/servers/$id/stop", cookie = cookie)
+        File(dir, "ops.json").writeText("[]")
+        File(dir, "extra.txt").writeText("not in the backup")
+        assertEquals(202, req("POST", "/api/servers/$id/backups/${enc(name)}/restore", cookie = cookie).status)
+        assertEquals("done", awaitJob(cookie, id).getString("state"))
+        assertTrue(File(dir, "ops.json").readText().contains("Steve"))
+        assertFalse(File(dir, "extra.txt").exists())
+
+        // Restoring keeps a safety copy of what was there.
+        val after = req("GET", "/api/servers/$id/backups", cookie = cookie).json.getJSONArray("backups")
+        assertTrue((0 until after.length()).any { after.getJSONObject(it).getString("label") == "before-restore" })
+
+        assertEquals(200, req("DELETE", "/api/servers/$id/backups/${enc(name)}", cookie = cookie).status)
+        assertEquals(404, req("DELETE", "/api/servers/$id/backups/${enc(name)}", cookie = cookie).status)
+        assertEquals(404, req("GET", "/api/servers/$id/backups/${enc(name)}/download", cookie = cookie).status)
+    }
+
+    @Test fun backup_endpoints_are_protected_and_ignore_traversal_in_names() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        assertEquals(401, req("GET", "/api/servers/$id/backups").status)
+        assertEquals(403, req("POST", "/api/servers/$id/backups", "{}", cookie, csrf = false).status)
+        assertEquals(403, req("DELETE", "/api/servers/$id/backups/x.zip", cookie = cookie, csrf = false).status)
+        for (evil in listOf("../x.zip", "..%2F..%2Fx.zip", "pumpkin.toml", "20260101-000000.zip%2F..%2F..%2Fx")) {
+            val p = "/api/servers/$id/backups/" + (if (evil.contains('%')) evil else enc(evil))
+            assertTrue(evil, req("GET", "$p/download", cookie = cookie).status in listOf(404))
+            assertTrue(evil, req("DELETE", p, cookie = cookie).status in listOf(404))
+            assertTrue(evil, req("POST", "$p/restore", cookie = cookie).status in listOf(404))
+        }
+        assertEquals(404, req("GET", "/api/servers/nope/backups", cookie = cookie).status)
+    }
+
+    @Test fun deleting_a_server_removes_its_backups() {
+        val cookie = login()
+        val id = createServer(cookie).getString("id")
+        req("POST", "/api/servers/$id/backups", "{}", cookie)
+        awaitJob(cookie, id)
+        assertEquals(1, backend.backups.list(id).size)
+        assertEquals(200, req("DELETE", "/api/servers/$id", cookie = cookie).status)
+        assertEquals(0, backend.backups.list(id).size)
+    }
+
     @Test fun a_running_server_can_be_restarted() {
         val cookie = login()
         val id = createServer(cookie).getString("id")

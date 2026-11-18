@@ -66,6 +66,7 @@ import app.dumpkin.data.ProfileRules
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.data.Status
 import app.dumpkin.server.ServerManager
+import app.dumpkin.update.UpdateState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -74,6 +75,7 @@ fun HomeScreen(onOpen: (String) -> Unit, onOpenEngine: () -> Unit, snack: (Strin
     val profiles by app.manager.profiles.collectAsState()
     val active by app.manager.active.collectAsState()
     val engine by app.engines.state.collectAsState()
+    val updateState by app.updates.state.collectAsState()
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showCreate by remember { mutableStateOf(false) }
     val ips = remember(active) { ServerManager.localAddresses() }
@@ -108,6 +110,9 @@ fun HomeScreen(onOpen: (String) -> Unit, onOpenEngine: () -> Unit, snack: (Strin
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (updateState is UpdateState.Available || updateState is UpdateState.Ready) {
+                item { UpdateBanner(onClick = onOpenEngine) }
+            }
             if (engine.installed.isEmpty()) {
                 item {
                     EngineBanner(supported = app.engines.supported, onClick = onOpenEngine)

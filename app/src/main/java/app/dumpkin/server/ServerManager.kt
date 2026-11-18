@@ -3,7 +3,10 @@ package app.dumpkin.server
 import android.app.Application
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import app.dumpkin.backup.BackupCenter
+import app.dumpkin.backup.BackupStore
 import app.dumpkin.data.PumpkinConfig
+import app.dumpkin.files.ServerFiles
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.data.ServerStore
 import app.dumpkin.data.Status
@@ -32,6 +35,21 @@ class ServerManager(private val app: Application, private val engines: EngineMan
     /** id -> name of every server that is starting, running or stopping. Drives the foreground service. */
     private val _active = MutableStateFlow<Map<String, String>>(emptyMap())
     val active: StateFlow<Map<String, String>> = _active.asStateFlow()
+
+    /** Zip backups of server folders, with background jobs shared by the app and the web dashboard. */
+    val backups = BackupCenter(
+        store = BackupStore(File(app.filesDir, "backups")),
+        scope = scope,
+        serverDir = { id -> if (_profiles.value.any { it.id == id }) store.dir(id) else null },
+        serverName = { id -> _profiles.value.firstOrNull { it.id == id }?.name },
+        isActive = { id -> runtimes[id]?.state?.value?.isActive == true },
+        appVersion = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull().orEmpty(),
+        // The backup's settings file may carry an old port; put this server's current settings back.
+        afterRestore = { id -> _profiles.value.firstOrNull { it.id == id }?.let { PumpkinConfig.write(store.dir(id), it) } },
+    )
+
+    /** Sandboxed access to a server's folder, or null if there is no such server. */
+    fun files(id: String): ServerFiles? = if (_profiles.value.any { it.id == id }) ServerFiles(store.dir(id)) else null
 
     fun runtime(id: String): ServerRuntime? {
         val profile = _profiles.value.firstOrNull { it.id == id } ?: return null
@@ -80,6 +98,7 @@ class ServerManager(private val app: Application, private val engines: EngineMan
         _profiles.update { list -> list.filterNot { it.id == id } }
         store.save(_profiles.value)
         store.deleteDir(id)
+        backups.deleteAll(id)
     }
 
     /** The profile with any values that were edited directly in pumpkin.toml folded in. */

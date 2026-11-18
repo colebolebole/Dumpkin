@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import app.dumpkin.engine.EngineManager
 import app.dumpkin.server.ServerManager
+import app.dumpkin.update.UpdateManager
 import app.dumpkin.web.AppBackend
 import app.dumpkin.web.WebController
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,8 @@ class DumpkinApp : Application() {
     lateinit var manager: ServerManager
         private set
     lateinit var web: WebController
+        private set
+    lateinit var updates: UpdateManager
         private set
 
     private val prefs by lazy { getSharedPreferences("dumpkin", Context.MODE_PRIVATE) }
@@ -46,6 +49,8 @@ class DumpkinApp : Application() {
         )
         // If the dashboard was left on, bring it back up with the app.
         web.startIfEnabled()
+        updates = UpdateManager(this)
+        updates.autoCheckIfDue()
     }
 
     companion object {

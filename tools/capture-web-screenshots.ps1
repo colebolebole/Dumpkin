@@ -82,7 +82,7 @@ try {
         $null = Send 'Emulation.setDeviceMetricsOverride' @{ width = $w; height = $h; deviceScaleFactor = $dsf; mobile = $mobile }
         Start-Sleep -Milliseconds 400
     }
-    function Go($hash) { Js "location.hash = '$hash'"; Start-Sleep -Milliseconds 1500 }
+    function Go($hash) { Js "location.hash = '$hash'; window.scrollTo(0, 0)"; Start-Sleep -Milliseconds 1500 }
     function Shot($name) {
         $reply = Send 'Page.captureScreenshot' @{ format = 'png' }
         if ($reply -notmatch '"data":"([^"]+)"') { throw "No screenshot data for $name" }
@@ -114,6 +114,19 @@ try {
     Js "const h = [...document.querySelectorAll('h2')].find(e => e.textContent.trim() === 'Network'); const card = h.closest('.card'); window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 130)"
     Start-Sleep -Milliseconds 1000
     Shot 'web-bedrock'
+
+    # Files and backups on a stopped server (changes are allowed there).
+    Size 1280 820 1.5 $false
+    Go '#/server/crash/files'
+    Shot 'web-files'
+    foreach ($label in 'nightly', 'before the update') {
+        Js "fetch('/api/servers/crash/backups', { method: 'POST', headers: { 'X-Requested-With': 'Dumpkin', 'Content-Type': 'application/json' }, body: JSON.stringify({ label: '$label' }) })"
+        Start-Sleep -Seconds 2
+    }
+    Size 1280 880 1.5 $false
+    Go '#/server/crash/backups'
+    Start-Sleep -Milliseconds 800
+    Shot 'web-backups'
 
     # The same dashboard on a phone, which is how most people will open it.
     Size 390 560 2 $true

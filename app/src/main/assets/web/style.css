@@ -335,3 +335,33 @@ h3.label { font-size: 0.8125rem; font-weight: 650; color: var(--muted); letter-s
 .card > .hint { margin: -6px 0 14px; }
 .row-switch + .row-switch, .row-switch + .field, .field + .row-switch { margin-top: 6px; }
 .field .hint { margin-top: 2px; }
+
+/* ---------- files and backups ---------- */
+.files-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; min-width: 0; font-size: 0.9375rem; }
+.crumb { border: 0; background: transparent; color: var(--primary); font-weight: 650; padding: 6px 8px; border-radius: 10px; cursor: pointer; overflow-wrap: anywhere; }
+.crumb:hover { background: var(--surface-2); }
+.crumbs .sep { color: var(--muted); }
+.files { display: flex; flex-direction: column; }
+.files .none { color: var(--muted); padding: 18px 4px; text-align: center; }
+.frow { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-top: 1px solid var(--line); min-height: 52px; }
+.frow:first-child { border-top: 0; }
+.fname { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; font-weight: 600; padding: 8px 6px; border-radius: 12px; cursor: pointer; color: var(--text); }
+.fname.static { cursor: default; }
+.fname > span { overflow-wrap: anywhere; }
+button.fname:hover { background: var(--surface-2); }
+.fname .i { color: var(--primary); flex: none; }
+.fmeta { color: var(--muted); font-size: 0.8125rem; white-space: nowrap; }
+.factions { display: flex; gap: 2px; flex: none; }
+.factions .icon-btn[disabled] { opacity: 0.35; pointer-events: none; }
+a.icon-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+textarea.editor { min-height: 360px; width: 100%; }
+.mt { margin-top: 14px; }
+.backup-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.backup-bar .input { flex: 1; min-width: 220px; }
+.job { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.875rem; font-weight: 600; background: var(--surface-2); border-radius: 18px; padding: 12px 16px; margin-bottom: 12px; }
+.job.bad { background: var(--error-c); color: var(--on-error-c); }
+@media (max-width: 640px) {
+  .wide-only { display: none; }
+  .seg.tabs button { padding: 0 6px; font-size: 0.8125rem; }
+}

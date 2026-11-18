@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
@@ -130,7 +131,7 @@ fun ServerScreen(id: String, onBack: () -> Unit) {
 
     // Settings tab: the status card rolls up as you scroll down and returns as soon as you scroll up.
     val collapse = remember { HeaderCollapse() }
-    collapse.enabled = tab == 1 && !imeVisible
+    collapse.enabled = tab != 0 && !imeVisible
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -169,21 +170,28 @@ fun ServerScreen(id: String, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(ButtonGroupGap),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 ) {
-                    listOf("Console", "Settings").forEachIndexed { i, label ->
+                    val tabNames = listOf("Console", "Settings", "Files", "Backups")
+                    tabNames.forEachIndexed { i, label ->
                         ToggleButton(
                             checked = tab == i,
                             onCheckedChange = { tab = i },
                             modifier = Modifier.weight(1f),
-                            shapes = if (i == 0) ButtonGroupDefaults.connectedLeadingButtonShapes()
-                            else ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                        ) { Text(label) }
+                            shapes = when (i) {
+                                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                tabNames.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                        ) { Text(label, maxLines = 1) }
                     }
                 }
             }
 
             when (tab) {
                 0 -> ConsolePane(rt, st.isActive, Modifier.weight(1f))
-                else -> SettingsPane(profile, rt, show, onDeleted = onBack, modifier = Modifier.weight(1f))
+                1 -> SettingsPane(profile, rt, show, onDeleted = onBack, modifier = Modifier.weight(1f))
+                2 -> FilesPane(profile, st.isActive, show, Modifier.weight(1f))
+                else -> BackupsPane(profile, st.isActive, show, Modifier.weight(1f))
             }
         }
     }
@@ -746,7 +754,7 @@ private fun SettingsPane(
     if (showDelete) {
         ConfirmDialog(
             title = "Delete \"${profile.name}\"?",
-            body = "The server, its world and all of its files will be permanently removed from this phone. This can't be undone.",
+            body = "The server, its world, all of its files and its backups will be permanently removed from this phone. This can't be undone.",
             confirm = "Delete",
             onDismiss = { showDelete = false },
             onConfirm = {

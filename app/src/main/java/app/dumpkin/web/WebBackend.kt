@@ -1,6 +1,8 @@
 package app.dumpkin.web
 
+import app.dumpkin.backup.BackupCenter
 import app.dumpkin.data.RuntimeState
+import app.dumpkin.files.ServerFiles
 import app.dumpkin.data.ServerProfile
 import app.dumpkin.engine.EngineUiState
 import app.dumpkin.server.LogSlice
@@ -43,6 +45,12 @@ interface WebBackend {
      */
     fun restart(id: String): String?
     fun command(id: String, command: String)
+
+    /** Safe file access inside the server's folder, or null when there is no such server. */
+    fun files(id: String): ServerFiles?
+
+    /** Backups and restores, which run in the background. */
+    val backups: BackupCenter
 
     fun readConfig(id: String): String
     fun writeConfig(id: String, text: String)

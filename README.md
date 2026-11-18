@@ -39,6 +39,9 @@
 - **Multiple servers.** Each has its own folder, port, world and `pumpkin.toml`.
 - **One-tap restart.** Restart a running server from the app or the web dashboard to apply new settings. It asks first if players are online.
 - **Bedrock on every server.** Each server can have its own Bedrock port, so several Bedrock servers run side by side (see [Bedrock servers](#bedrock-servers)).
+- **Backups.** Zip a server's whole folder in one tap, restore it later, and save the zip off the phone, from the app or the web dashboard (see [Files and backups](#files-and-backups)).
+- **File browser.** Look through a server's folder, open and edit text files such as `ops.json`, make folders, rename and delete, in the app and the dashboard.
+- **App updates.** The app checks the Dumpkin releases on GitHub, downloads a newer APK, verifies it and hands it to Android's installer (see [App updates](#app-updates)).
 - **Runs in the background.** A foreground service with a wake lock and low-latency Wi-Fi lock keeps servers up, with a "Stop all" button in the notification.
 - **Live console.** Send commands and watch players, uptime and RAM use. Tap the command box and the console takes over the whole screen; close the keyboard and everything comes back.
 - **Roomy settings.** The status card rolls up as you scroll down the settings and returns as soon as you scroll up.
@@ -62,7 +65,7 @@
 > finished with its servers, then uninstall it. The `0.1.0` and `0.2.0` AnCraft releases were signed with a throwaway
 > debug key; Dumpkin releases use a proper release key.
 
-Dumpkin releases share one package name and release key, so a newer APK (for example 0.5.0) installs over any earlier Dumpkin release (0.3.0 or later) and keeps your servers.
+Dumpkin releases share one package name and release key, so a newer APK (for example 0.5.0) installs over any earlier Dumpkin release (0.3.0 or later) and keeps your servers. From the release that adds [App updates](#app-updates) onward, the app can fetch the next one itself.
 
 ## More screenshots
 
@@ -78,6 +81,12 @@ under Build for how they're made.
     <td align="center"><img src="docs/screenshots/engine.png" alt="The Engine tab" width="200"><br><sub>Engine builds</sub></td>
     <td align="center"><img src="docs/screenshots/tuning-checks.png" alt="Device tuning checks" width="200"><br><sub>Tuning checks</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/files.png" alt="A server's file browser" width="200"><br><sub>File browser</sub></td>
+    <td align="center"><img src="docs/screenshots/backups.png" alt="A server's backups" width="200"><br><sub>Backups</sub></td>
+    <td align="center"><img src="docs/screenshots/update-banner.png" alt="The Servers tab with an update banner" width="200"><br><sub>Update waiting</sub></td>
+    <td align="center"><img src="docs/screenshots/update.png" alt="The app update card" width="200"><br><sub>App updates</sub></td>
+  </tr>
 </table>
 
 **Web dashboard**, which is the same app in a browser, on a PC or another phone:
@@ -90,6 +99,10 @@ under Build for how they're made.
   <tr>
     <td align="center"><img src="docs/screenshots/web-console.png" alt="A server's live console in the dashboard" width="400"><br><sub>Live console</sub></td>
     <td align="center"><img src="docs/screenshots/web-bedrock.png" alt="Network settings in the dashboard, with a Bedrock port" width="400"><br><sub>Every setting, including the Bedrock port</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-files.png" alt="The file browser in the dashboard" width="400"><br><sub>File browser</sub></td>
+    <td align="center"><img src="docs/screenshots/web-backups.png" alt="Backups in the dashboard" width="400"><br><sub>Backups: create, download, restore</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/screenshots/web-login.png" alt="The dashboard sign-in page" width="400"><br><sub>Password sign-in</sub></td>
@@ -106,6 +119,7 @@ the same Wi-Fi, sign in with the password from the same tab, and you can:
 - create, start, stop, restart and delete servers, with a live status for each
 - watch the console and send commands
 - change every setting from the table below, and edit `pumpkin.toml` directly
+- browse and edit a server's files, and make, download, restore and delete backups (see [Files and backups](#files-and-backups))
 - download, update and remove engine builds
 
 It works fully offline (nothing is loaded from the internet), follows your light or dark theme, and is laid out for
@@ -135,6 +149,12 @@ Everything the page does goes through a JSON API, so you can script it. Sign in 
 | `POST /api/servers/{id}/command` | Send a console command (`{"command": "list"}`) |
 | `GET /api/servers/{id}/logs?after=N` | Console lines after line `N`; `reset` is true if you must start over |
 | `GET`, `PUT /api/servers/{id}/config`, `POST .../config/reset` | Read, write or reset `pumpkin.toml` |
+| `GET /api/servers/{id}/files?path=`, `DELETE` the same | List a folder (relative to the server folder), or delete a file or folder |
+| `GET`, `PUT /api/servers/{id}/files/content` | Read (`?path=`) or save (`{"path", "text"}`) a UTF-8 text file up to 256 KB |
+| `POST /api/servers/{id}/files/mkdir`, `/rename` | Make a folder (`{"path"}`) or rename an item (`{"path", "name"}`) |
+| `GET /api/servers/{id}/files/download?path=` | Download a file (always an attachment) |
+| `GET`, `POST /api/servers/{id}/backups` | List backups and the running job, or start a backup (`{"label"}`) |
+| `POST /api/servers/{id}/backups/{name}/restore`, `DELETE .../{name}`, `GET .../{name}/download` | Restore, delete or download a backup |
 | `GET /api/engine`, `POST /api/engine/refresh`, `/download`, `DELETE /api/engine/{id}` | Manage engine builds |
 
 </details>
@@ -172,6 +192,50 @@ Bedrock support is experimental in Pumpkin, and off by default. To use it:
 Every server needs its own Bedrock port. Dumpkin rejects a port that matches the server's own Java port, or any other
 server's Java or Bedrock port. Servers that already used Bedrock keep 19132. The port is written to
 `[networking.bedrock.nethernet] address` in `pumpkin.toml`.
+
+## Files and backups
+
+Every server has **Files** and **Backups** tabs next to Console and Settings, in the app and in the web dashboard.
+
+**Files**
+- Browse the server's folder, open text files (up to 256 KB, UTF-8) such as `ops.json` or `pumpkin.toml`, edit and save them, make
+  folders, rename and delete. In the app, "Save a copy…" writes any file to a place you choose; in the dashboard every file
+  has a download button.
+- **Changes need the server stopped.** A running server rewrites its own files, and deleting a world under it corrupts it,
+  so while it runs you can still look at and download files but not change them (the dashboard returns `409`).
+- Everything is confined to the server's own folder. `..`, absolute paths and symlinks that point elsewhere are refused, and
+  deleting never follows a symlink. Downloads are always sent as attachments, so a file from a server can't run as a page
+  on the dashboard.
+
+**Backups**
+- **Back up now** zips the whole server folder (world, settings, files) into `backups/<server>/` in the app's private storage.
+  Add a label if you like. It runs in the background with a progress bar. Backing up a running server works, but the world can
+  be caught mid-save, so stop it first when you want a guaranteed-consistent copy.
+- **Restore** replaces the server's files with the backup. It needs the server stopped, first saves what is there as a
+  `before-restore` backup, unpacks into a temporary folder (rejecting any entry that would land outside it), and only then
+  swaps it in, so a failed restore leaves your server as it was. The server's current ports and settings are kept.
+- **Save it off the phone.** "Save to your files" in the app, or the download button in the dashboard, gives you the plain `.zip`.
+  Backups live in the app's storage, so uninstalling Dumpkin deletes them: keep a copy of anything you care about.
+- Deleting a server deletes its backups too.
+
+## App updates
+
+The **Engine** tab has an **App updates** card. Dumpkin looks at the releases of this repository on GitHub (when the app
+opens, at most every 12 hours, or when you tap **Check for updates**) and shows a banner on the Servers tab when a newer
+version is out. **Download** fetches the APK and checks it before offering **Install**:
+
+- its size matches the release, and its SHA-256 matches the one in the release notes when they quote one;
+- it is the same app (`app.dumpkin`) signed with the same key as the installed one, so Android will accept it as an update.
+
+Then Android's own installer takes over and asks for your confirmation: nothing is ever installed silently. The first time,
+Android asks you to allow Dumpkin to install apps. Installing restarts the app, which stops running servers, so the card warns
+you if any are running. Updates only come from GitHub over HTTPS (a redirect anywhere else is refused).
+
+> [!NOTE]
+> **While the repository is private**, GitHub only shows its releases to someone signed in, so the check fails with "HTTP 404"
+> until you add a **GitHub access token** (the card has a button). Create a fine-grained personal access token with read-only
+> access to the repository's *Contents*, and paste it in. It is stored only on the phone and sent only to `api.github.com`,
+> never to the download host. Once the repository is public no token is needed.
 
 ## Engine tab
 

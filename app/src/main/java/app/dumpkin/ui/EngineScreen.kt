@@ -71,6 +71,7 @@ fun EngineScreen() {
         onCheck = { app.engines.checkRemote() },
         onDownload = { app.engines.download(it) },
         onDelete = { app.engines.delete(it) },
+        extra = { UpdateCard() },
     )
 }
 
@@ -84,6 +85,8 @@ fun EngineContent(
     onCheck: () -> Unit,
     onDownload: (RemoteEngine) -> Unit,
     onDelete: (String) -> Unit,
+    /** Extra content shown above "About", e.g. the app update card. Kept out of here so tests don't need the app. */
+    extra: @Composable () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -170,6 +173,9 @@ fun EngineContent(
                     error = false,
                 )
             }
+
+            item { Header("Dumpkin") }
+            item { extra() }
 
             item { Header("About") }
             item {

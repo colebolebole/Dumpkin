@@ -39,6 +39,8 @@ import app.dumpkin.engine.EngineUiState
 import app.dumpkin.engine.InstalledEngine
 import app.dumpkin.engine.RemoteEngine
 import app.dumpkin.server.ServerManager
+import app.dumpkin.update.ReleaseInfo
+import app.dumpkin.update.UpdateState
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -135,6 +137,35 @@ class Screenshots {
         mgr.runtime("cre")!!.state.value =
             RuntimeState(Status.Running, online = 0, max = 20, version = "1.21.10", rssMb = 388, startedAt = now - 38 * 60_000L)
         getField<MutableStateFlow<Map<String, String>>>(mgr, "_active").value = mapOf("smp" to smp.name, "cre" to creative.name)
+
+        // A stopped server with files and a couple of backups, for the Files and Backups tabs.
+        val hdir = mgr.dir("hrd")
+        File(hdir, "ops.json").writeText("[\n  {\"name\": \"Steve\", \"level\": 4}\n]\n")
+        File(hdir, "whitelist.json").writeText("[]\n")
+        File(hdir, "world/region").mkdirs()
+        File(hdir, "world/level.dat").writeBytes(ByteArray(1_800) { (it * 7).toByte() })
+        File(hdir, "world/region/r.0.0.mca").writeBytes(ByteArray(900_000) { (it % 97).toByte() })
+        File(hdir, "logs").mkdirs()
+        File(hdir, "logs/latest.log").writeText("00:00:01 INFO Started server\n")
+        for ((label, hoursAgo) in listOf("nightly" to 26L, "before the update" to 3L)) {
+            check(mgr.backups.startBackup("hrd", label) == null)
+            while (mgr.backups.job("hrd")?.isRunning == true) Thread.sleep(10)
+            mgr.backups.file("hrd", mgr.backups.list("hrd").first { it.label.isNotEmpty() && it.label == app.dumpkin.backup.BackupStore.slug(label) }.name)!!
+                .setLastModified(now - hoursAgo * 3_600_000L)
+            mgr.backups.dismiss("hrd")
+        }
+    }
+
+    /** Pretends GitHub has a newer release, so the update card and banner can be shown. */
+    private fun offerUpdate() {
+        val release = ReleaseInfo(
+            tag = "v0.6.0-alpha", version = "0.6.0-alpha", title = "Dumpkin 0.6.0 Alpha",
+            notes = "**Backups, a file browser and in-app updates.**\n\n### What's new\n- Back up a server and restore it later\n" +
+                "- Browse and edit a server's files\n- Update Dumpkin from inside the app",
+            assetName = "Dumpkin-0.6.0-alpha.apk", assetApiUrl = "https://api.github.com/x", downloadUrl = "https://github.com/x",
+            size = 1_650_000, sha256 = null, publishedAt = "2026-11-20T10:00:00Z", pageUrl = "https://github.com/x",
+        )
+        getField<MutableStateFlow<UpdateState>>(app().updates, "_state").value = UpdateState.Available(release)
     }
 
     /** Compose tests wait for animations to finish, but Dumpkin's status blob spins forever, so drive the clock by hand. */
@@ -233,6 +264,27 @@ class Screenshots {
         }
         step("shot")
         shot("bedrock")
+
+        // Files and backups on a stopped server (changes are allowed there).
+        step("files")
+        click(rule.onNodeWithContentDescription("Back"))
+        click(rule.onNodeWithText("Hardcore Test"))
+        click(rule.onNodeWithText("Files"))
+        shot("files")
+        step("backups")
+        click(rule.onNodeWithText("Backups"))
+        shot("backups")
+
+        // An update is waiting: banner on the Servers tab, card on the Engine tab.
+        step("update")
+        click(rule.onNodeWithContentDescription("Back"))
+        offerUpdate()
+        settle()
+        shot("update-banner")
+        nav("Engine")
+        rule.onNode(hasScrollAction()).performScrollToIndex(7)
+        settle()
+        shot("update")
         step("done")
     }
 }
